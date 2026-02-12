@@ -1,0 +1,48 @@
+# FastAPI Backend Dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+sqlalchemy==2.0.25
+pydantic==2.5.3
+python-multipart==0.0.6
+
+# Database
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# HTTP Client
+httpx==0.26.0
+requests==2.31.0
+
+# Web Scraping (for UI schema extraction)
+beautifulsoup4==4.12.3
+lxml==5.1.0
+
+# Synthetic Data Generation
+pandas==2.2.0
+numpy==1.26.3
+faker==22.5.1
+# sdv==1.9.0  # Uncomment for production SDV usage
+
+# Testing & Validation
+jsonschema==4.21.1
+
+# Azure OpenAI
+openai==1.10.0
+
+# LangGraph & LangChain Agent Framework
+langgraph==0.0.62
+langchain==0.2.0
+langchain-openai==0.1.6
+langchain-community==0.2.0
+
+# Vector Store for Memory (Optional)
+chromadb==0.4.22
+
+# UI Automation with Playwright
+playwright==1.42.0
+
+# Additional utilities
+aiohttp==3.9.3

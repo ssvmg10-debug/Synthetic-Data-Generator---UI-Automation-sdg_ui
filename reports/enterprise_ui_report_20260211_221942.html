@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Enterprise UI Automation Report – LG India & Hilti India</title>
+<style>
+body { font-family: system-ui, 'Segoe UI', sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 8px; }
+h2 { color: #94a3b8; margin-top: 32px; }
+.summary { display: flex; gap: 24px; margin: 20px 0; flex-wrap: wrap; }
+.summary .card { background: #1e293b; padding: 16px 24px; border-radius: 12px; min-width: 140px; }
+.summary .card.passed { border-left: 4px solid #22c55e; }
+.summary .card.failed { border-left: 4px solid #ef4444; }
+.summary .card.total { border-left: 4px solid #38bdf8; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+th { background: #334155; color: #94a3b8; }
+.step-row td { vertical-align: top; }
+.step-desc { max-width: 400px; }
+.step-img { max-width: 320px; max-height: 240px; border-radius: 8px; border: 1px solid #475569; cursor: pointer; }
+.step-img:hover { outline: 2px solid #38bdf8; }
+.status-passed { color: #22c55e; }
+.status-failed { color: #ef4444; }
+.meta { color: #64748b; font-size: 14px; margin: 8px 0; }
+a { color: #38bdf8; }
+</style>
+</head>
+<body>
+<h1>Enterprise UI Automation Report – LG India & Hilti India</h1>
+<p class='meta'>Generated: 2026-02-11 16:49:42 UTC | Application: LG India, Hilti India</p>
+<div class='summary'>
+<div class='card total'><strong>Total</strong><br>2</div>
+<div class='card passed'><strong>Passed</strong><br>0</div>
+<div class='card failed'><strong>Failed</strong><br>2</div>
+</div>
+<h2 id='lg_e2e_01'>lg_e2e_01: Full checkout flow to payment</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 205.1s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>Timeout after 180 seconds</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.lg.com/in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds for page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Accept on cookie banner if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>click</strong> Click Shop in the main navigation</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for Shop menu to expand</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>click</strong> Click Home Appliances category</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click Refrigerators subcategory</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for products to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>click</strong> Click the first product link in the listing</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for product detail page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>click</strong> Click Add to Cart on product detail page</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>13</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for cart update</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>14</td><td class='step-desc'><strong>click</strong> Click Cart to view cart contents</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>15</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for cart page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>16</td><td class='step-desc'><strong>click</strong> Click Proceed to Checkout</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>17</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds for checkout page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>18</td><td class='step-desc'><strong>type</strong> Type test@example.com in email field if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>19</td><td class='step-desc'><strong>click</strong> Click Continue as Guest or Continue</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>20</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds for guest checkout to proceed</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>21</td><td class='step-desc'><strong>verify</strong> Verify that the shipping address or payment step is displayed</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='hilti_e2e_01'>hilti_e2e_01: Products to product detail and cart</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 107.1s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 329-350: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.hilti.in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Accept on cookie banner if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>click</strong> Click Products in the main navigation</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>click</strong> Click Power Tools category</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for category page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click the first product in the product list</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds for product detail page to load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>click</strong> Click Add to Cart on the product detail page</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>wait</strong> Wait 1 second for cart update</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>click</strong> Click Cart icon or link to view cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>13</td><td class='step-desc'><strong>verify</strong> Verify that the cart page is displayed</td><td><span>—</span></td></tr>
+</tbody></table>
+</body></html>

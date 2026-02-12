@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Quick test</title>
+<style>
+body { font-family: system-ui, 'Segoe UI', sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 8px; }
+h2 { color: #94a3b8; margin-top: 32px; }
+.summary { display: flex; gap: 24px; margin: 20px 0; flex-wrap: wrap; }
+.summary .card { background: #1e293b; padding: 16px 24px; border-radius: 12px; min-width: 140px; }
+.summary .card.passed { border-left: 4px solid #22c55e; }
+.summary .card.failed { border-left: 4px solid #ef4444; }
+.summary .card.total { border-left: 4px solid #38bdf8; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+th { background: #334155; color: #94a3b8; }
+.step-row td { vertical-align: top; }
+.step-desc { max-width: 400px; }
+.step-img { max-width: 320px; max-height: 240px; border-radius: 8px; border: 1px solid #475569; cursor: pointer; }
+.step-img:hover { outline: 2px solid #38bdf8; }
+.status-passed { color: #22c55e; }
+.status-failed { color: #ef4444; }
+.meta { color: #64748b; font-size: 14px; margin: 8px 0; }
+a { color: #38bdf8; }
+</style>
+</head>
+<body>
+<h1>Quick test</h1>
+<p class='meta'>Generated: 2026-02-11 16:50:36 UTC | Application: N/A</p>
+<div class='summary'>
+<div class='card total'><strong>Total</strong><br>1</div>
+<div class='card passed'><strong>Passed</strong><br>1</div>
+<div class='card failed'><strong>Failed</strong><br>0</div>
+</div>
+<h2 id='lg_01'>lg_01: Cookie accept</h2>
+<p class='meta'>Status: <span class='status-passed'>passed</span>
+ | Duration: 10.5s
+</p>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to LG</td><td><span>—</span></td></tr>
+</tbody></table>
+</body></html>

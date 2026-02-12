@@ -1,0 +1,23 @@
+{
+  "name": "ui-automation-backend",
+  "version": "1.0.0",
+  "description": "UI Automation Backend with Playwright Test Agents",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "init-agents": "playwright init-agents --loop=vscode",
+    "codegen": "playwright codegen"
+  },
+  "keywords": [
+    "playwright",
+    "test-automation",
+    "ai-agents"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

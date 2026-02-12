@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-02-11T12:47:39.644734",
+  "synthetic_data_tests": [
+    {
+      "test_name": "Generate Data from UI Form Schema",
+      "result": {
+        "status": "PASSED",
+        "details": "Successfully extracted schema and generated synthetic data",
+        "schema_id": 14,
+        "rows_generated": 10
+      }
+    },
+    {
+      "test_name": "Generate Data from API Schema",
+      "result": {
+        "status": "PASSED",
+        "details": "Successfully extracted API schema and generated synthetic data",
+        "schema_id": 15,
+        "rows_generated": 10
+      }
+    }
+  ],
+  "ui_automation_tests": [
+    {
+      "test_name": "LG TV Purchase Flow",
+      "result": {
+        "status": "PASSED",
+        "details": "Test completed successfully. Status: failed",
+        "test_case_id": 16,
+        "run_id": 10,
+        "execution_time": 6.14
+      }
+    },
+    {
+      "test_name": "Sauce Demo Shopping Cart",
+      "result": {
+        "status": "PASSED",
+        "details": "Test completed successfully. Status: failed",
+        "test_case_id": 17,
+        "run_id": 11,
+        "execution_time": 6.11
+      }
+    },
+    {
+      "test_name": "Hilti Power Tools Purchase",
+      "result": {
+        "status": "PASSED",
+        "details": "Test completed successfully. Status: failed",
+        "test_case_id": 18,
+        "run_id": 12,
+        "execution_time": 6.1
+      }
+    }
+  ],
+  "summary": {
+    "synthetic_data": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "success_rate": "100.0%"
+    },
+    "ui_automation": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "success_rate": "100.0%"
+    },
+    "overall": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "success_rate": "100.0%"
+    }
+  }
+}

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Enterprise UI Automation Report – LG India & Hilti India</title>
+<style>
+body { font-family: system-ui, 'Segoe UI', sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 8px; }
+h2 { color: #94a3b8; margin-top: 32px; }
+.summary { display: flex; gap: 24px; margin: 20px 0; flex-wrap: wrap; }
+.summary .card { background: #1e293b; padding: 16px 24px; border-radius: 12px; min-width: 140px; }
+.summary .card.passed { border-left: 4px solid #22c55e; }
+.summary .card.failed { border-left: 4px solid #ef4444; }
+.summary .card.total { border-left: 4px solid #38bdf8; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; background: #1e293b; border-radius: 8px; overflow: hidden; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+th { background: #334155; color: #94a3b8; }
+.step-row td { vertical-align: top; }
+.step-desc { max-width: 400px; }
+.step-img { max-width: 320px; max-height: 240px; border-radius: 8px; border: 1px solid #475569; cursor: pointer; }
+.step-img:hover { outline: 2px solid #38bdf8; }
+.status-passed { color: #22c55e; }
+.status-failed { color: #ef4444; }
+.meta { color: #64748b; font-size: 14px; margin: 8px 0; }
+a { color: #38bdf8; }
+</style>
+</head>
+<body>
+<h1>Enterprise UI Automation Report – LG India & Hilti India</h1>
+<p class='meta'>Generated: 2026-02-11 16:19:31 UTC | Application: LG India, Hilti India</p>
+<div class='summary'>
+<div class='card total'><strong>Total</strong><br>6</div>
+<div class='card passed'><strong>Passed</strong><br>0</div>
+<div class='card failed'><strong>Failed</strong><br>6</div>
+</div>
+<h2 id='lg_e2e_01'>lg_e2e_01: Full checkout flow to payment</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 189.7s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>Timeout after 180 seconds</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.lg.com/in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Accept on cookie banner if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>click</strong> Click Shop</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>click</strong> Click Home Appliances</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click Refrigerators</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>click</strong> Click first product link</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>click</strong> Click Add to cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>13</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>14</td><td class='step-desc'><strong>click</strong> Click Cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>15</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>16</td><td class='step-desc'><strong>click</strong> Click Proceed to checkout or Checkout</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>17</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>18</td><td class='step-desc'><strong>type</strong> Type test@example.com in email field if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>19</td><td class='step-desc'><strong>click</strong> Click Continue as guest or Continue</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>20</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>21</td><td class='step-desc'><strong>verify</strong> Verify we reach shipping address or payment step</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='lg_e2e_02'>lg_e2e_02: Search product and add to cart</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 142.6s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 329-350: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.lg.com/in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Accept on cookie if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>type</strong> Type refrigerator in Search</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>click</strong> Press Enter</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>wait</strong> Wait 4 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click first product in search results</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>click</strong> Click Add to cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>click</strong> Click Cart or View cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>13</td><td class='step-desc'><strong>verify</strong> Verify cart has at least one item</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='lg_e2e_03'>lg_e2e_03: Navigate to payment page</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 128.8s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 330-351: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.lg.com/in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>comment</strong> Accept cookie if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Shop</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>click</strong> Click Refrigerators</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>click</strong> Click first product</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>comment</strong> Add to cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>navigate</strong> Go to cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>click</strong> Click Checkout</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>type</strong> Fill email test@example.com if asked</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>click</strong> Click Continue</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>wait</strong> Wait for payment or order summary page</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='hilti_e2e_01'>hilti_e2e_01: Products to product detail and cart</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 83.3s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 329-350: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.hilti.in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Accept on cookie if visible</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>click</strong> Click Products</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>click</strong> Click Power tools</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click first product</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>comment</strong> Add to cart or View product</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>11</td><td class='step-desc'><strong>click</strong> Click Cart</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>12</td><td class='step-desc'><strong>verify</strong> Verify cart or product page</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='hilti_e2e_02'>hilti_e2e_02: Search and open product</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 59.1s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 327-349: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.hilti.in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>comment</strong> Accept cookie</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Search</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>type</strong> Type drill</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>click</strong> Press Enter</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>7</td><td class='step-desc'><strong>wait</strong> Wait 3 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>8</td><td class='step-desc'><strong>click</strong> Click first search result</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>9</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>10</td><td class='step-desc'><strong>verify</strong> Verify product detail or add to cart visible</td><td><span>—</span></td></tr>
+</tbody></table>
+<h2 id='hilti_e2e_03'>hilti_e2e_03: Login page flow</h2>
+<p class='meta'>Status: <span class='status-failed'>failed</span>
+ | Duration: 45.4s
+</p>
+<pre class='status-failed' style='white-space:pre-wrap;max-width:800px;'>'charmap' codec can't encode characters in position 327-349: character maps to &lt;undefined&gt;</pre>
+<table><thead><tr><th>Step</th><th>Action / Description</th><th>Screenshot</th></tr></thead><tbody>
+<tr class='step-row'><td>1</td><td class='step-desc'><strong>navigate</strong> Initial page load</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>2</td><td class='step-desc'><strong>navigate</strong> Go to https://www.hilti.in/</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>3</td><td class='step-desc'><strong>comment</strong> Accept cookie</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>4</td><td class='step-desc'><strong>click</strong> Click Login or Register</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>5</td><td class='step-desc'><strong>wait</strong> Wait 2 seconds</td><td><span>—</span></td></tr>
+<tr class='step-row'><td>6</td><td class='step-desc'><strong>verify</strong> Verify login form or email field is visible</td><td><span>—</span></td></tr>
+</tbody></table>
+</body></html>

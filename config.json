@@ -1,0 +1,27 @@
+{
+  "backend": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": true
+  },
+  "database": {
+    "url": "sqlite:///./enterprise_automation.db"
+  },
+  "synthetic_data": {
+    "default_model": "GaussianCopula",
+    "max_rows": 10000
+  },
+  "ui_automation": {
+    "playwright_timeout": 60,
+    "screenshot_on_failure": true,
+    "self_healing_enabled": true
+  },
+  "api_automation": {
+    "request_timeout": 30,
+    "retry_count": 3
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  }
+}
