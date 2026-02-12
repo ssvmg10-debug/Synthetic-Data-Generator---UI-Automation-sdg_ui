@@ -4,7 +4,7 @@ Endpoints for schema extraction and data generation
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from db import get_db
 from models import Schema, SyntheticRun, SyntheticData
@@ -39,14 +39,16 @@ class MergeSchemaRequest(BaseModel):
     api_schema: Optional[Dict[str, Any]] = None
 
 class GenerateDataRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     schema_id: Optional[int] = None
     schema: Optional[Dict[str, Any]] = None
     num_rows: int = 10
-    model: str = "GaussianCopula"
+    model_name: str = Field(default="GaussianCopula", alias="model")
 
 class NaturalLanguageRequest(BaseModel):
+    model_config = {"populate_by_name": True}
     user_input: str
-    model: str = "GaussianCopula"
+    model_name: str = Field(default="GaussianCopula", alias="model")
     chat_id: Optional[int] = None  # If set, append to this chat and return chat_id in response
 
 # ========== ENDPOINTS ==========
@@ -62,7 +64,7 @@ async def generate_from_natural_language(request: NaturalLanguageRequest, db: Se
         logger.info("="*80)
         logger.info("SYNTHETIC DATA REQUEST RECEIVED (LangGraph Workflow)")
         logger.info("User Input: %s...", request.user_input[:100] if len(request.user_input) > 100 else request.user_input)
-        logger.info("Model: %s", request.model)
+        logger.info("Model: %s", request.model_name)
         logger.info("="*80)
 
         # Session/state: ensure chat exists and append user message
@@ -124,7 +126,7 @@ async def generate_from_natural_language_legacy(request: NaturalLanguageRequest,
         logger.info("="*80)
         logger.info(f"🧬 SYNTHETIC DATA REQUEST RECEIVED (LEGACY)")
         logger.info(f"📝 User Input: {request.user_input[:100]}...")
-        logger.info(f"🎲 Model: {request.model}")
+        logger.info(f"🎲 Model: {request.model_name}")
         logger.info("="*80)
         
         # Parse user input to extract schema and num_rows
@@ -196,24 +198,24 @@ async def generate_from_natural_language_legacy(request: NaturalLanguageRequest,
         
         # Generate synthetic data
         generator = SDVGenerator()
-        logger.info(f"🎲 Generating {num_rows} rows using {request.model}...")
+        logger.info(f"🎲 Generating {num_rows} rows using {request.model_name}...")
         
-        synthetic_data = generator.generate(schema, num_rows=num_rows, model=request.model)
+        synthetic_data = generator.generate(schema, num_rows=num_rows, model=request.model_name)
         
         logger.info(f"✅ Generated {len(synthetic_data)} rows")
         
         # Save run
-        run = SyntheticRun(schema_id=db_schema.id, rows=num_rows, model=request.model)
+run = SyntheticRun(schema_id=db_schema.id, rows=num_rows, model=request.model_name)
         db.add(run)
         db.commit()
         db.refresh(run)
-        
+
         # Save data
         for row in synthetic_data:
             data_row = SyntheticData(run_id=run.id, row_json=row)
             db.add(data_row)
         db.commit()
-        
+
         logger.info(f"✅ Complete! Run ID: {run.id}")
         logger.info("="*80)
         logger.info(f"🎉 SUCCESS: Generated {len(synthetic_data)} rows")
@@ -378,19 +380,19 @@ async def generate_synthetic_data(request: GenerateDataRequest, db: Session = De
         else:
             raise HTTPException(status_code=400, detail="Provide schema_id or schema")
         
-        logger.info(f"🎲 Generating {request.num_rows} rows of synthetic data using {request.model} model...")
+        logger.info(f"🎲 Generating {request.num_rows} rows of synthetic data using {request.model_name} model...")
         
         # Generate synthetic data
-        synthetic_data = generator.generate(schema, num_rows=request.num_rows, model=request.model)
+        synthetic_data = generator.generate(schema, num_rows=request.num_rows, model=request.model_name)
         
         logger.info(f"✅ Successfully generated {len(synthetic_data)} rows of data")
         
         # Save run info
-        run = SyntheticRun(schema_id=schema_id, rows=request.num_rows, model=request.model)
+run = SyntheticRun(schema_id=schema_id, rows=request.num_rows, model=request.model_name)
         db.add(run)
         db.commit()
         db.refresh(run)
-        
+
         logger.info(f"💾 Saving data to database (Run ID: {run.id})...")
         
         # Save generated data

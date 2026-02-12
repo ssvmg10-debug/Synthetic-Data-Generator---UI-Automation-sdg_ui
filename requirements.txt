@@ -2,7 +2,8 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 sqlalchemy==2.0.25
-pydantic==2.5.3
+# >=2.7.4 required by langchain-core on Python 3.12+
+pydantic>=2.7.4,<3
 python-multipart==0.0.6
 
 # Database
@@ -29,17 +30,18 @@ faker==22.5.1
 # Testing & Validation
 jsonschema==4.21.1
 
-# Azure OpenAI
-openai==1.10.0
+# Azure OpenAI (1.40+ required by langchain-openai; pin to avoid resolver backtracking)
+openai==1.40.0
 
-# LangGraph & LangChain Agent Framework
-langgraph==0.0.62
+# LangGraph & LangChain Agent Framework (0.2.14+ fixes __start__ KeyError)
+langchain-core>=0.2.27,<0.3
+langgraph==0.2.14
 langchain==0.2.0
-langchain-openai==0.1.6
+langchain-openai==0.1.20
 langchain-community==0.2.0
 
-# Vector Store for Memory (Optional)
-chromadb==0.4.22
+# Vector store: we use Postgres (agent_memory.embedding). For similarity search use pgvector:
+# pip install pgvector  # then add extension and vector column via migration
 
 # UI Automation with Playwright
 playwright==1.42.0

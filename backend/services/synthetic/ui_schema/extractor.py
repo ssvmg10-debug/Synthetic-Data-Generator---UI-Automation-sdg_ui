@@ -9,6 +9,7 @@ import re
 import requests
 from typing import Dict, Any, List, Optional
 import logging
+import os
 import subprocess
 from pathlib import Path
 from datetime import datetime
@@ -123,9 +124,10 @@ class UISchemaExtractor:
         script_content = f"""
 const {{ chromium }} = require('playwright');
 const fs = require('fs');
+const path = require('path');
 
 (async () => {{
-    const browser = await chromium.launch({{ headless: false, slowMo: 500 }});
+    const browser = await chromium.launch({{ headless: true, slowMo: 100 }});
     const context = await browser.newContext();
     const page = await context.newPage();
     
@@ -138,7 +140,8 @@ const fs = require('fs');
     console.log('📄 Extracting HTML content...');
     const html = await page.content();
     
-    fs.writeFileSync('page_content.html', html, 'utf-8');
+    const outDir = process.env.OUTPUT_DIR || __dirname;
+    fs.writeFileSync(path.join(outDir, 'page_content.html'), html, 'utf-8');
     console.log('✅ HTML extracted and saved successfully');
     console.log('📊 Content length: ' + html.length + ' characters');
     
@@ -150,14 +153,17 @@ const fs = require('fs');
             logger.info("📝 Writing Playwright crawl script to %s", output_dir)
             with open(script_file, "w", encoding="utf-8") as f:
                 f.write(script_content)
-            
+            env = os.environ.copy()
+            env["OUTPUT_DIR"] = str(output_dir.absolute())
+            script_rel = script_file.relative_to(backend_root).as_posix()
             result = subprocess.run(
-                ["node", "crawl_script.js"],
+                ["node", script_rel],
                 capture_output=True,
                 text=True,
                 timeout=60,
                 encoding="utf-8",
-                cwd=str(output_dir.absolute()),
+                cwd=str(backend_root),
+                env=env,
             )
             
             logger.info("📋 Playwright output: %s", result.stdout or result.stderr)

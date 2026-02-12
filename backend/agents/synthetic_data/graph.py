@@ -3,7 +3,7 @@ Synthetic Data LangGraph Workflow
 Linear workflow: parse → crawl → merge → generate
 """
 import logging
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from agents.synthetic_data.state import SyntheticDataState
 from agents.synthetic_data.nodes import (
     parse_test_case_node,
@@ -33,9 +33,13 @@ def create_synthetic_data_graph(db: Session):
     workflow.add_node("merge_schemas", lambda state: merge_schemas_node(state, db))
     workflow.add_node("generate_data", lambda state: generate_data_node(state, db))
     
-    # Define edges (linear flow)
-    workflow.set_entry_point("parse_test_case")
-    workflow.add_edge("parse_test_case", "crawl_pages")
+    def _after_parse(state):
+        """If parse set error (e.g. no URLs), go to END; else crawl."""
+        return "end" if state.get("error") else "crawl"
+
+    # Define edges: START -> parse, then conditional/linear chain
+    workflow.add_edge(START, "parse_test_case")
+    workflow.add_conditional_edges("parse_test_case", _after_parse, {"end": END, "crawl": "crawl_pages"})
     workflow.add_edge("crawl_pages", "merge_schemas")
     workflow.add_edge("merge_schemas", "generate_data")
     workflow.add_edge("generate_data", END)

@@ -53,6 +53,7 @@ app.add_middleware(
 app.include_router(synthetic_data.router, prefix="/synthetic", tags=["Synthetic Data"])
 app.include_router(ui_automation.router, prefix="/ui", tags=["UI Automation"])
 app.include_router(api_automation.router, prefix="/api", tags=["API Automation"])
+app.include_router(chats.router, prefix="/chats", tags=["Chats"])
 # app.include_router(integrated_testing.router)  # TODO: Fix model imports
 
 @app.on_event("startup")

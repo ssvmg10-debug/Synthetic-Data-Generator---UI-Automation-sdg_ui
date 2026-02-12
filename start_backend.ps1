@@ -1,8 +1,18 @@
 # Start Backend Server (FastAPI)
-# Run from project root. Uses Python from PATH (no venv required).
+# Run from project root. Optionally activate venv if path exists.
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Optional: activate shared venv (set $VENV_ACTIVATE to your venv\Scripts\Activate.ps1 if needed)
+$venvPath = $env:VENV_ACTIVATE
+if (-not $venvPath -and (Test-Path "C:\Users\gparavasthu\Workspace\Truvelocity\code_export\agentic-sdlc-platform\venv\Scripts\Activate.ps1")) {
+  $venvPath = "C:\Users\gparavasthu\Workspace\Truvelocity\code_export\agentic-sdlc-platform\venv\Scripts\Activate.ps1"
+}
+if ($venvPath -and (Test-Path $venvPath)) {
+  Write-Host "Activating venv: $venvPath" -ForegroundColor Yellow
+  & $venvPath
+}
 
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host "  Starting FastAPI Backend" -ForegroundColor Green
@@ -38,6 +48,14 @@ if (Test-Path ".env") { Get-Content ".env" | ForEach-Object { if ($_ -match '^([
 Write-Host "Initializing database..." -ForegroundColor Yellow
 python -c "from db import init_db; init_db()"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# Ensure backend has Playwright for crawl/UI automation (optional)
+if (Test-Path "node_modules") {
+  if (-not (Test-Path "node_modules\playwright")) {
+    Write-Host "Installing Playwright in backend for UI crawl..." -ForegroundColor Yellow
+    npm install playwright@^1.49.0 --save-dev 2>$null
+  }
+}
 
 Write-Host ""
 Write-Host "Server: http://localhost:$port" -ForegroundColor Cyan

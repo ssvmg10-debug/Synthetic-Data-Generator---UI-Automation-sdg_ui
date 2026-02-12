@@ -13,9 +13,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _backend_dir() -> Path:
+    """Backend root (so node_modules/@playwright/test and playwright.config resolve)."""
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
 class PlaywrightExecutor:
     def __init__(self):
-        self.output_dir = Path("test_outputs")
+        self.output_dir = _backend_dir() / "test_outputs"
         self.output_dir.mkdir(exist_ok=True)
 
     def execute(
@@ -41,8 +46,9 @@ class PlaywrightExecutor:
             with open(test_file, "w") as f:
                 f.write(headed_script)
 
-            node_bin_path = self.output_dir.parent / "node_modules" / ".bin"
-            cwd = self.output_dir.parent
+            backend_root = _backend_dir()
+            node_bin_path = backend_root / "node_modules" / ".bin"
+            cwd = backend_root
             # Pass path relative to cwd so Playwright finds the test file (use forward slashes for CLI)
             test_file_rel = test_file.relative_to(cwd).as_posix()
             env = os.environ.copy()

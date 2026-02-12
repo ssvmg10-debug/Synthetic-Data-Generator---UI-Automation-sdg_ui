@@ -3,7 +3,7 @@ UI Automation LangGraph Workflow
 Workflow with self-healing loop: plan → generate → execute → monitor → heal → retry
 """
 import logging
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from agents.ui_automation.state import UIAutomationState
 from agents.ui_automation.nodes import (
     plan_test_node,
@@ -72,7 +72,7 @@ def create_ui_automation_graph(db: Session):
     workflow.add_node("retry_execution", lambda state: retry_execution_node(state, db))
     
     # Define edges
-    workflow.set_entry_point("plan_test")
+    workflow.add_edge(START, "plan_test")
     workflow.add_edge("plan_test", "generate_script")
     workflow.add_edge("generate_script", "execute_test")
     workflow.add_edge("execute_test", "monitor_execution")
