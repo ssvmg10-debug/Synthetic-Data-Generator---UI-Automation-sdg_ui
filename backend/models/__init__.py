@@ -195,3 +195,32 @@ class AgentMemory(Base):
     relevance_score = Column(Integer)  # Usage/relevance tracking
     created_at = Column(DateTime, default=datetime.utcnow)
     accessed_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ========== CHAT / SESSION TABLES (memory, state, UI history) ==========
+
+class ChatSession(Base):
+    """One conversation (like a ChatGPT thread). Keyed by agent_type."""
+    __tablename__ = "chat_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    agent_type = Column(String, nullable=False, index=True)  # 'synthetic', 'ui-automation'
+    title = Column(String(512), nullable=True)  # Optional; can be derived from first user message
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    messages = relationship("ChatMessage", back_populates="chat_session", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
+
+
+class ChatMessage(Base):
+    """A single message in a chat session (user or agent)."""
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False, index=True)
+    sender = Column(String(20), nullable=False)  # 'user', 'agent'
+    text = Column(Text, nullable=False)
+    payload = Column(JSON, nullable=True)  # SyntheticPayload or UiAutomationPayload
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    chat_session = relationship("ChatSession", back_populates="messages")

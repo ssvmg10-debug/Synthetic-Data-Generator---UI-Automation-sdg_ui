@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from db import get_db
 from models import UITestCase, UIExecutionRun, LocatorRegistry
+from routers.chats import ensure_chat_and_append_user_message, append_agent_message
 from services.ui_automation.agents.planner.agent import PlannerAgent
 from services.ui_automation.agents.generator.agent import GeneratorAgent
 from services.ui_automation.agents.validator.agent import ValidatorAgent
@@ -28,8 +29,8 @@ class UITestRequest(BaseModel):
     page_url: Optional[str] = None
     use_synthetic_data: bool = False
     synthetic_run_id: Optional[int] = None
-    # Preferred script language for generated Playwright tests
     script_language: Optional[str] = "javascript"
+    chat_id: Optional[int] = None  # If set, append to this chat; response includes chat_id
 
 class UIExecuteRequest(BaseModel):
     test_case_id: int
@@ -263,13 +264,16 @@ async def execute_ui_test(request: UIExecuteRequest, background_tasks: Backgroun
 @router.post("/run")
 async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Full workflow: plan -> generate -> validate -> execute"""
+    chat_id = None
     try:
-        # Require raw_input so we don't crash and return clear 400
         if not request.raw_input or not request.raw_input.strip():
             raise HTTPException(
                 status_code=400,
                 detail="raw_input is required. Send your test scenario or steps in the message."
             )
+        chat_id = ensure_chat_and_append_user_message(
+            db, request.chat_id, "ui-automation", request.raw_input
+        )
         logger.info("="*80)
         logger.info("UI AUTOMATION REQUEST RECEIVED")
         logger.info("Raw Input: %s...", (request.raw_input[:100] if len(request.raw_input) > 100 else request.raw_input))
@@ -382,20 +386,35 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         logger.info("SUCCESS: UI Test Complete")
         logger.info("Execution ID: %s | Status: %s", execution_run.id, result.get("status"))
         logger.info("="*80)
-        
+
+        agent_text = "UI automation %s for execution %s." % (result.get("status"), execution_run.id)
+        payload = {
+            "kind": "ui",
+            "status": result.get("status"),
+            "testCaseId": test_case.id,
+            "executionId": execution_run.id,
+            "plan": structured_plan,
+            "script": script,
+            "healingHistory": {
+                "healed": result.get("healed", False),
+                "screenshot": result.get("screenshot_path"),
+            },
+        }
+        append_agent_message(db, chat_id, agent_text, payload)
+
         return {
             "execution_id": execution_run.id,
             "test_case_id": test_case.id,
             "status": result.get("status"),
             "validation": validation,
-             # Expose full structured plan and generated script to the UI
             "plan": structured_plan,
             "script": script,
             "healed": result.get("healed", False),
             "logs": result.get("logs"),
             "screenshot": result.get("screenshot_path"),
             "step_screenshots": result.get("step_screenshots", []),
-            "message": "UI test completed"
+            "message": "UI test completed",
+            "chat_id": chat_id,
         }
     except HTTPException:
         raise
@@ -405,6 +424,11 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         logger.error("="*80)
         import traceback
         logger.error(traceback.format_exc())
+        if chat_id is not None:
+            try:
+                append_agent_message(db, chat_id, "Sorry, something went wrong: %s" % str(e), None)
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/results/{execution_id}")

@@ -4,7 +4,7 @@ Single backend service running on port 8000
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routers import synthetic_data, ui_automation, api_automation
+from routers import synthetic_data, ui_automation, api_automation, chats
 import logging
 import sys
 import os
@@ -73,7 +73,8 @@ async def root():
         "endpoints": {
             "synthetic": "/synthetic/*",
             "ui_automation": "/ui/*",
-            "api_automation": "/api/*"
+            "api_automation": "/api/*",
+            "chats": "/chats/*"
         }
     }
 

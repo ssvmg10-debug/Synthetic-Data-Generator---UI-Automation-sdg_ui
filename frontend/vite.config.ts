@@ -9,7 +9,8 @@ export default defineConfig({
     proxy: {
       "/synthetic": "http://localhost:8000",
       "/ui": "http://localhost:8000",
-      "/api": "http://localhost:8000"
+      "/api": "http://localhost:8000",
+      "/chats": "http://localhost:8000"
     }
   },
   build: {

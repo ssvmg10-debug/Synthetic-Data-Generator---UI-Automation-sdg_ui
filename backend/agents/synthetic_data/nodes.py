@@ -3,6 +3,7 @@ Synthetic Data Agent Nodes
 LangGraph nodes for synthetic data generation workflow
 """
 import re
+import json
 import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
@@ -14,6 +15,37 @@ from models import Schema, SyntheticRun, SyntheticData, CrawlCache
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_json_from_llm(content: str) -> Dict[str, Any]:
+    """Extract a single JSON object from LLM response (handles markdown and extra text)."""
+    if not content or not content.strip():
+        raise ValueError("Empty response")
+    text = content.strip()
+    # Remove markdown code blocks
+    if "```" in text:
+        for marker in ("```json", "```"):
+            if marker in text:
+                start = text.find(marker) + len(marker)
+                end = text.find("```", start)
+                if end == -1:
+                    text = text[start:].strip()
+                else:
+                    text = text[start:end].strip()
+                break
+    # Find first complete JSON object
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("No JSON object found in response")
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(text[start : i + 1])
+    raise ValueError("No complete JSON object found")
 
 
 def parse_test_case_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:
@@ -50,48 +82,61 @@ def parse_test_case_node(state: SyntheticDataState, db: Session) -> Dict[str, An
 
 def crawl_pages_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:
     """
-    Node 2: Crawl URLs to extract form schemas
+    Node 2: Crawl URLs (test-case-aware) to extract form schemas.
+    Stores crawl response in temp_crawl/crawls, in DB (CrawlCache + Schema).
     """
     logger.info("================================================================================")
-    logger.info("🔹 NODE 2: CRAWL PAGES")
+    logger.info("🔹 NODE 2: CRAWL PAGES (test-case-aware)")
     logger.info("================================================================================")
     
     urls = state['urls']
+    test_case = state.get('test_case') or ""
     crawled_schemas = {}
     
     for url in urls:
-        logger.info(f"🌐 Crawling: {url}")
+        logger.info("🌐 Crawling: %s", url)
         
-        # Check cache first
         cache_entry = db.query(CrawlCache).filter(
             CrawlCache.url == url,
             CrawlCache.expires_at > datetime.utcnow()
         ).first()
         
         if cache_entry:
-            logger.info(f"✅ Using cached schema for {url}")
+            logger.info("✅ Using cached schema for %s", url)
             crawled_schemas[url] = cache_entry.schema_json
             continue
         
-        # Crawl the page
         try:
             extractor = UISchemaExtractor()
-            schema = extractor.extract_from_url(url)
+            result = extractor.extract_from_url(url, test_case=test_case)
+            schema = result.get("schema") or result
+            html = result.get("html", "")
+            output_dir = result.get("output_dir", "")
             
-            # Cache the result
+            if isinstance(schema, dict):
+                num_fields = len(schema.get("fields", [])) if isinstance(schema.get("fields"), list) else len(schema.get("fields", {}))
+            else:
+                num_fields = 0
+            logger.info("✅ Extracted schema with %s fields (saved to %s)", num_fields, output_dir or "temp_crawl")
+            
             cache = CrawlCache(
                 url=url,
                 schema_json=schema,
+                html_snapshot=html[:500000] if html else None,
                 expires_at=datetime.utcnow() + timedelta(hours=24)
             )
             db.add(cache)
             db.commit()
             
+            schema_row = Schema(source="ui_crawl", schema_json=schema)
+            db.add(schema_row)
+            db.commit()
+            logger.info("💾 Crawl schema saved to DB (CrawlCache + Schema id=%s)", schema_row.id)
+            
             crawled_schemas[url] = schema
-            logger.info(f"✅ Extracted schema with {len(schema.get('fields', {}))} fields")
             
         except Exception as e:
-            logger.error(f"❌ Failed to crawl {url}: {str(e)}")
+            logger.error("❌ Failed to crawl %s: %s", url, e)
             crawled_schemas[url] = {"error": str(e)}
     
     return {
@@ -146,7 +191,8 @@ Return JSON:
             temperature=0
         )
         
-        merged_schema = json.loads(response.choices[0].message.content)
+        raw = response.choices[0].message.content or ""
+        merged_schema = _parse_json_from_llm(raw)
         logger.info(f"✅ Merged schema with {len(merged_schema.get('fields', {}))} fields")
         
         # Save schema to database

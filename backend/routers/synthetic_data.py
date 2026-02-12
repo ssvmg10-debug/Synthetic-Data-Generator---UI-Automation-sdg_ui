@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from db import get_db
 from models import Schema, SyntheticRun, SyntheticData
+from routers.chats import ensure_chat_and_append_user_message, append_agent_message
 from services.synthetic.ui_schema.extractor import UISchemaExtractor
 from services.synthetic.api_schema.extractor import APISchemaExtractor
 from services.synthetic.unified_schema.merger import SchemaMerger
@@ -46,6 +47,7 @@ class GenerateDataRequest(BaseModel):
 class NaturalLanguageRequest(BaseModel):
     user_input: str
     model: str = "GaussianCopula"
+    chat_id: Optional[int] = None  # If set, append to this chat and return chat_id in response
 
 # ========== ENDPOINTS ==========
 
@@ -55,12 +57,18 @@ async def generate_from_natural_language(request: NaturalLanguageRequest, db: Se
     Generate synthetic data from natural language description using LangGraph workflow
     This endpoint now uses the agent-based workflow with UI crawling
     """
+    chat_id = None
     try:
         logger.info("="*80)
         logger.info("SYNTHETIC DATA REQUEST RECEIVED (LangGraph Workflow)")
         logger.info("User Input: %s...", request.user_input[:100] if len(request.user_input) > 100 else request.user_input)
         logger.info("Model: %s", request.model)
         logger.info("="*80)
+
+        # Session/state: ensure chat exists and append user message
+        chat_id = ensure_chat_and_append_user_message(
+            db, request.chat_id, "synthetic", request.user_input
+        )
 
         # Run LangGraph workflow
         result = await run_synthetic_data_workflow(
@@ -72,19 +80,40 @@ async def generate_from_natural_language(request: NaturalLanguageRequest, db: Se
         if result['status'] == 'success':
             logger.info("Workflow complete! Run ID: %s", result['run_id'])
             logger.info("="*80)
-            
+            agent_text = "Generated synthetic data run #%s with %s rows." % (
+                result['run_id'], len(result['generated_data'])
+            )
+            payload = {
+                "kind": "synthetic",
+                "runId": result["run_id"],
+                "schemaId": result.get("schema_id"),
+                "rowsGenerated": len(result["generated_data"]),
+                "dataPreview": (result["generated_data"] or [])[:50],
+            }
+            append_agent_message(db, chat_id, agent_text, payload)
             return {
                 "message": "Synthetic data generated successfully via agent workflow",
                 "run_id": result['run_id'],
                 "schema_id": result['schema_id'],
                 "rows_generated": len(result['generated_data']),
-                "data": result['generated_data']
+                "data": result['generated_data'],
+                "chat_id": chat_id,
             }
         else:
+            append_agent_message(
+                db, chat_id,
+                "Sorry, workflow failed: %s" % result.get("error", "Unknown error"),
+                None,
+            )
             raise HTTPException(status_code=500, detail=result.get('error', 'Workflow failed'))
         
     except Exception as e:
         logger.error("Synthetic workflow error: %s", str(e))
+        if chat_id is not None:
+            try:
+                append_agent_message(db, chat_id, "Sorry, something went wrong: %s" % str(e), None)
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=str(e))
 
 

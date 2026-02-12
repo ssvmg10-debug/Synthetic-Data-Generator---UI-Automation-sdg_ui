@@ -1,15 +1,33 @@
 """
 UI Schema Extractor
-Extracts field schema from UI elements
+Extracts field schema from UI elements.
+Supports test-case-aware crawling (e.g. login then capture post-login page).
 """
 from bs4 import BeautifulSoup
+import json
+import re
 import requests
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 import subprocess
 from pathlib import Path
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def _credentials_from_test_case(test_case: str) -> Optional[Dict[str, str]]:
+    """Extract username/password from test case text if present."""
+    if not test_case:
+        return None
+    # Patterns: "user name: X", "username: X", "pass: X", "password: X"
+    user_m = re.search(r"user\s*name:\s*([^\s,.\n]+)", test_case, re.I) or re.search(
+        r"username:\s*([^\s,.\n]+)", test_case, re.I
+    )
+    pass_m = re.search(r"pass(?:word)?\s*:\s*([^\s,.\n]+)", test_case, re.I)
+    if user_m and pass_m:
+        return {"username": user_m.group(1).strip(), "password": pass_m.group(1).strip()}
+    return None
 
 class UISchemaExtractor:
     def __init__(self):
@@ -41,29 +59,73 @@ class UISchemaExtractor:
             "total_fields": len(fields)
         }
     
-    def extract_from_url(self, url: str) -> Dict[str, Any]:
-        """Extract schema by fetching URL using Playwright (HEADED mode)"""
-        logger.info(f"🌐 UI Schema Extraction: Crawling URL with Playwright (HEADED mode)...")
-        logger.info(f"📍 Target URL: {url}")
+    def extract_from_url(
+        self,
+        url: str,
+        test_case: Optional[str] = None,
+        output_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """
+        Crawl URL with Playwright (test-case-aware: can perform login if test case mentions it).
+        Persists HTML and schema under temp_crawl; returns schema + html for DB storage.
+        """
+        logger.info("🌐 UI Schema Extraction: Crawling URL with Playwright (test-case-aware)...")
+        logger.info("📍 Target URL: %s", url)
         
-        try:
-            # Temp dir under backend so path is correct regardless of process cwd
-            backend_root = Path(__file__).resolve().parent.parent.parent.parent
-            temp_dir = backend_root / "temp_crawl"
-            temp_dir.mkdir(exist_ok=True)
-            script_file = temp_dir / "crawl_script.js"
-            output_file = temp_dir / "page_content.html"
-            
-            # Create Playwright script that saves HTML to file
-            script_content = f"""
+        backend_root = Path(__file__).resolve().parent.parent.parent.parent
+        temp_base = backend_root / "temp_crawl"
+        temp_base.mkdir(exist_ok=True)
+        crawls_dir = temp_base / "crawls"
+        crawls_dir.mkdir(exist_ok=True)
+        
+        if output_dir is None:
+            url_slug = re.sub(r"[^\w\-.]", "_", url.replace("https://", "").replace("http://", ""))[:80]
+            stamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            output_dir = crawls_dir / f"{stamp}_{url_slug}"
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        script_file = output_dir / "crawl_script.js"
+        output_file = output_dir / "page_content.html"
+        schema_file = output_dir / "schema.json"
+        
+        creds = _credentials_from_test_case(test_case or "")
+        do_login = (
+            creds
+            and test_case
+            and "login" in test_case.lower()
+        )
+        
+        # Build Playwright script: goto URL, optionally login, then capture HTML
+        login_block = ""
+        if do_login:
+            un = creds["username"].replace("\\", "\\\\").replace("'", "\\'")
+            pw = creds["password"].replace("\\", "\\\\").replace("'", "\\'")
+            login_block = f"""
+    console.log('🔐 Test case mentions login - attempting login...');
+    try {{
+        const userSel = 'input[name*="user"], input[id*="user"], input[type="text"]';
+        const passSel = 'input[name*="pass"], input[id*="pass"], input[type="password"]';
+        const userEl = await page.$(userSel);
+        const passEl = await page.$(passSel);
+        if (userEl && passEl) {{
+            await userEl.fill('{un}');
+            await passEl.fill('{pw}');
+            await page.waitForTimeout(500);
+            const submit = await page.$('button[type="submit"], input[type="submit"], button:has-text("Login"), input[value="Login"]');
+            if (submit) await submit.click();
+            await page.waitForTimeout(3000);
+            console.log('✅ Login step completed');
+        }}
+    }} catch (e) {{ console.log('Login step skipped:', e.message); }}
+"""
+        
+        script_content = f"""
 const {{ chromium }} = require('playwright');
 const fs = require('fs');
 
 (async () => {{
-    const browser = await chromium.launch({{ 
-        headless: false,
-        slowMo: 500
-    }});
+    const browser = await chromium.launch({{ headless: false, slowMo: 500 }});
     const context = await browser.newContext();
     const page = await context.newPage();
     
@@ -72,83 +134,87 @@ const fs = require('fs');
     
     console.log('⏳ Waiting for page to fully render...');
     await page.waitForTimeout(2000);
-    
+{login_block}
     console.log('📄 Extracting HTML content...');
     const html = await page.content();
     
-    console.log('Saving HTML to file...');
     fs.writeFileSync('page_content.html', html, 'utf-8');
-    
     console.log('✅ HTML extracted and saved successfully');
     console.log('📊 Content length: ' + html.length + ' characters');
     
     await browser.close();
 }})();
 """
-            
-            logger.info("📝 Writing Playwright crawl script...")
-            with open(script_file, 'w', encoding='utf-8') as f:
+        
+        try:
+            logger.info("📝 Writing Playwright crawl script to %s", output_dir)
+            with open(script_file, "w", encoding="utf-8") as f:
                 f.write(script_content)
             
-            logger.info("🎭 Launching Playwright browser (HEADED mode)...")
-            logger.info("👀 Browser window will open - you can watch the crawling!")
-            
-            # Execute Playwright script (use script name only so cwd is correct; avoid temp_crawl/temp_crawl)
             result = subprocess.run(
                 ["node", "crawl_script.js"],
                 capture_output=True,
                 text=True,
-                timeout=45,
+                timeout=60,
                 encoding="utf-8",
-                cwd=str(temp_dir.absolute()),
+                cwd=str(output_dir.absolute()),
             )
             
-            logger.info(f"📋 Playwright output: {result.stdout}")
+            logger.info("📋 Playwright output: %s", result.stdout or result.stderr)
             
             if result.returncode != 0:
-                logger.error(f"❌ Playwright execution failed: {result.stderr}")
-                logger.info("⚠️ Falling back to requests library...")
-                # Fallback to requests
+                logger.error("❌ Playwright execution failed: %s", result.stderr)
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 html_content = response.text
+                schema = self.extract_from_html(html_content)
+                output_file.write_text(html_content, encoding="utf-8")
+                schema_file.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+                return {"schema": schema, "html": html_content, "output_dir": str(output_dir.absolute())}
             elif output_file.exists():
-                # Read HTML from saved file
-                logger.info(f"✅ Reading HTML from saved file: {output_file}")
-                with open(output_file, 'r', encoding='utf-8') as f:
+                with open(output_file, "r", encoding="utf-8") as f:
                     html_content = f.read()
-                logger.info(f"📊 HTML content length: {len(html_content)} characters")
+                logger.info("✅ Read HTML from %s (%s chars)", output_file, len(html_content))
             else:
-                logger.error("❌ Output file not found, falling back to requests")
+                logger.error("❌ Output file not found")
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
                 html_content = response.text
             
-            # Clean up temp files
-            try:
-                if script_file.exists():
-                    script_file.unlink()
-                if output_file.exists():
-                    output_file.unlink()
-            except Exception as cleanup_error:
-                logger.warning(f"⚠️ Cleanup warning: {cleanup_error}")
+            schema = self.extract_from_html(html_content)
+            # Persist schema to same folder
+            with open(schema_file, "w", encoding="utf-8") as f:
+                json.dump(schema, f, indent=2)
+            logger.info("💾 Saved schema to %s", schema_file)
+            # Do NOT delete output_dir / HTML / schema — keep for inspection
             
-            return self.extract_from_html(html_content)
+            return {
+                "schema": schema,
+                "html": html_content,
+                "output_dir": str(output_dir.absolute()),
+            }
             
         except subprocess.TimeoutExpired:
             logger.error("❌ Playwright timeout - falling back to requests")
             response = requests.get(url, timeout=10)
             response.raise_for_status()
-            return self.extract_from_html(response.text)
+            html_content = response.text
+            schema = self.extract_from_html(html_content)
+            output_file.write_text(html_content, encoding="utf-8")
+            schema_file.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+            return {"schema": schema, "html": html_content, "output_dir": str(output_dir.absolute())}
         except Exception as e:
-            logger.error(f"❌ Error during URL extraction: {str(e)}")
-            logger.info("⚠️ Attempting fallback to requests library...")
+            logger.error("❌ Error during URL extraction: %s", e)
             try:
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
-                return self.extract_from_html(response.text)
+                html_content = response.text
+                schema = self.extract_from_html(html_content)
+                output_file.write_text(html_content, encoding="utf-8")
+                schema_file.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+                return {"schema": schema, "html": html_content, "output_dir": str(output_dir.absolute())}
             except Exception as fallback_error:
-                raise Exception(f"Failed to fetch URL: {str(e)} | Fallback also failed: {str(fallback_error)}")
+                raise Exception(f"Failed to fetch URL: {str(e)} | Fallback: {str(fallback_error)}")
     
     def extract_from_structure(self, fields_structure: Dict[str, Any]) -> Dict[str, Any]:
         """Extract schema from provided structure"""

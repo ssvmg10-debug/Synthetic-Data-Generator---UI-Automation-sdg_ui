@@ -94,15 +94,119 @@ body {
 
 .agent-chat-root {
   width: 100%;
-  max-width: 1120px;
+  max-width: 1200px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 0;
   background: rgba(15, 23, 42, 0.9);
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 16px;
+  overflow: hidden;
   box-shadow: 0 22px 60px rgba(15, 23, 42, 0.85);
+}
+
+.agent-chat-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.chat-sidebar-new {
+  margin: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(79, 70, 229, 0.5);
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.2));
+  color: #e5e7eb;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.chat-sidebar-new:hover {
+  opacity: 0.9;
+}
+
+.chat-sidebar-loading {
+  padding: 12px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.chat-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.chat-sidebar-empty {
+  padding: 12px 10px;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  margin: 0;
+  list-style: none;
+}
+
+.chat-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.chat-sidebar-item:hover {
+  background: rgba(55, 65, 81, 0.5);
+  color: #e5e7eb;
+}
+
+.chat-sidebar-item-active {
+  background: rgba(79, 70, 229, 0.25);
+  color: #e5e7eb;
+}
+
+.chat-sidebar-item-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-sidebar-item-delete {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-sidebar-item-delete:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.agent-chat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
 }
 
 .agent-chat-header {

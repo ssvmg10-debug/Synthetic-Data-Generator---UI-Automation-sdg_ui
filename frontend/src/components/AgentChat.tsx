@@ -1,17 +1,16 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { ChatMessageList } from "./ChatMessageList";
 import { ChatInput } from "./ChatInput";
 import { SyntheticResponseCard } from "./SyntheticResponseCard";
 import { UiAutomationResponseCard } from "./UiAutomationResponseCard";
 
-// API base URL: use env override, or in dev call backend directly so proxy is not required
 const getApiBase = (): string => {
   if (typeof import.meta.env.VITE_API_URL === "string" && import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/$/, "");
   }
   if (import.meta.env.DEV) {
-    // Default dev port for this project. (8000 is commonly used by other local services.)
-    return "http://localhost:8001";
+    // Use empty string so Vite proxy (vite.config.ts) forwards /chats, /synthetic, /ui to backend
+    return "";
   }
   return "";
 };
@@ -52,17 +51,103 @@ export interface ChatMessage extends BaseMessage {
   payload: MessagePayload;
 }
 
+interface ChatListItem {
+  id: number;
+  agent_type: string;
+  title: string | null;
+  updated_at: string;
+  message_count: number;
+}
+
 interface AgentChatProps {
   agentType: AgentType;
 }
 
+const agentTypeForApi = (t: AgentType): string =>
+  t === "synthetic" ? "synthetic" : "ui-automation";
+
 export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatId, setChatId] = useState<number | null>(null);
+  const [chats, setChats] = useState<ChatListItem[]>([]);
+  const [chatsLoading, setChatsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [scriptLanguage, setScriptLanguage] = useState<"javascript" | "typescript">(
-    "javascript"
-  );
+  const [scriptLanguage, setScriptLanguage] = useState<"javascript" | "typescript">("javascript");
   const [useSyntheticData, setUseSyntheticData] = useState(false);
+
+  const apiBase = getApiBase();
+  const apiAgentType = agentTypeForApi(agentType);
+
+  const fetchChats = useCallback(async () => {
+    setChatsLoading(true);
+    try {
+      const url = `${apiBase}/chats?agent_type=${encodeURIComponent(apiAgentType)}&limit=50`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const list: ChatListItem[] = await res.json();
+        setChats(list);
+      }
+      // On error, keep previous list so we don't wipe the sidebar
+    } catch {
+      // Keep existing chats on network error
+    } finally {
+      setChatsLoading(false);
+    }
+  }, [apiBase, apiAgentType]);
+
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
+
+  const loadChat = useCallback(
+    async (id: number) => {
+      try {
+        const res = await fetch(`${apiBase}/chats/${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const msgs: ChatMessage[] = (data.messages || []).map((m: any) => ({
+          id: String(m.id),
+          sender: m.sender,
+          text: m.text,
+          createdAt: m.created_at || new Date().toISOString(),
+          payload: m.payload ?? null
+        }));
+        setMessages(msgs);
+        setChatId(id);
+      } catch {
+        setMessages([]);
+        setChatId(null);
+      }
+    },
+    [apiBase]
+  );
+
+  const handleNewChat = useCallback(() => {
+    setChatId(null);
+    setMessages([]);
+    // Refetch so the chat we're leaving (if any) appears in the sidebar and stays stored
+    fetchChats();
+  }, [fetchChats]);
+
+  const handleDeleteChat = useCallback(
+    async (id: number, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!confirm("Delete this chat?")) return;
+      try {
+        const res = await fetch(`${apiBase}/chats/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          if (chatId === id) {
+            setChatId(null);
+            setMessages([]);
+          }
+          fetchChats();
+        }
+      } catch {
+        fetchChats();
+      }
+    },
+    [apiBase, chatId, fetchChats]
+  );
 
   const handleSend = useCallback(
     async (text: string, fileText?: string) => {
@@ -80,37 +165,40 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
       setMessages(prev => [...prev, userMsg]);
       setIsSending(true);
 
+      const combinedText =
+        fileText && fileText.trim().length > 0
+          ? `${text}\n\n--- Uploaded test case ---\n${fileText}`
+          : text;
+
       try {
-        const combinedText =
-          fileText && fileText.trim().length > 0
-            ? `${text}\n\n--- Uploaded test case ---\n${fileText}`
-            : text;
-
-        const apiBase = getApiBase();
-
         if (agentType === "synthetic") {
           const res = await fetch(`${apiBase}/synthetic/generate-from-text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               user_input: combinedText,
-              model: "GaussianCopula"
+              model: "GaussianCopula",
+              chat_id: chatId ?? undefined
             })
           });
 
           if (!res.ok) {
-            const msg = res.status === 404
-              ? "Synthetic endpoint not found (404). Check backend is running at http://localhost:8000"
-              : `Synthetic agent error: ${res.status} ${res.statusText}`;
+            const msg =
+              res.status === 404
+                ? "Synthetic endpoint not found (404). Check backend is running."
+                : `Synthetic agent error: ${res.status} ${res.statusText}`;
             throw new Error(msg);
           }
 
           const data = await res.json();
+          if (data.chat_id != null) setChatId(data.chat_id);
 
           const agentMsg: ChatMessage = {
             id: `a-${Date.now()}`,
             sender: "agent",
-            text: `Generated synthetic data run #${data.run_id} with ${data.rows_generated ?? data.data?.length ?? 0} rows.`,
+            text:
+              data.message ||
+              `Generated synthetic data run #${data.run_id} with ${data.rows_generated ?? data.data?.length ?? 0} rows.`,
             createdAt: new Date().toISOString(),
             payload: {
               kind: "synthetic",
@@ -120,7 +208,6 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               dataPreview: Array.isArray(data.data) ? data.data.slice(0, 50) : []
             }
           };
-
           setMessages(prev => [...prev, agentMsg]);
         } else {
           const res = await fetch(`${apiBase}/ui/run`, {
@@ -130,18 +217,21 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               raw_input: combinedText,
               use_synthetic_data: useSyntheticData,
               synthetic_run_id: undefined,
-              script_language: scriptLanguage
+              script_language: scriptLanguage,
+              chat_id: chatId ?? undefined
             })
           });
 
           if (!res.ok) {
-            const msg = res.status === 404
-              ? "UI automation endpoint not found (404). Check backend is running at http://localhost:8000"
-              : `UI automation agent error: ${res.status} ${res.statusText}`;
+            const msg =
+              res.status === 404
+                ? "UI automation endpoint not found (404). Check backend is running."
+                : `UI automation agent error: ${res.status} ${res.statusText}`;
             throw new Error(msg);
           }
 
           const data = await res.json();
+          if (data.chat_id != null) setChatId(data.chat_id);
 
           const agentMsg: ChatMessage = {
             id: `a-${Date.now()}`,
@@ -153,7 +243,6 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               status: data.status,
               testCaseId: data.test_case_id,
               executionId: data.execution_id,
-              // Prefer explicit plan/script fields, fall back gracefully if missing
               plan: data.plan ?? data.validation ?? null,
               script: data.script ?? null,
               healingHistory: {
@@ -162,13 +251,12 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               }
             }
           };
-
           setMessages(prev => [...prev, agentMsg]);
         }
+        fetchChats();
       } catch (err) {
         const errorText =
           err instanceof Error ? err.message : "Unknown error while calling agent";
-
         const errorMsg: ChatMessage = {
           id: `e-${Date.now()}`,
           sender: "agent",
@@ -181,69 +269,105 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
         setIsSending(false);
       }
     },
-    [agentType, scriptLanguage, useSyntheticData]
+    [agentType, scriptLanguage, useSyntheticData, chatId, apiBase, fetchChats]
   );
 
   return (
     <div className="agent-chat-root">
-      <div className="agent-chat-header">
-        <div>
-          <div className="agent-title">
-            {agentType === "synthetic" ? "Synthetic Data Agent" : "UI Automation Agent"}
+      <aside className="agent-chat-sidebar">
+        <button type="button" className="chat-sidebar-new" onClick={handleNewChat}>
+          + New chat
+        </button>
+        {chatsLoading ? (
+          <div className="chat-sidebar-loading">Loading…</div>
+        ) : (
+          <ul className="chat-sidebar-list">
+            {chats.length === 0 && (
+              <li className="chat-sidebar-empty">
+                No previous chats. Send a message to create one.
+              </li>
+            )}
+            {chats.map(c => (
+              <li
+                key={c.id}
+                className={"chat-sidebar-item" + (chatId === c.id ? " chat-sidebar-item-active" : "")}
+                onClick={() => loadChat(c.id)}
+              >
+                <span className="chat-sidebar-item-title" title={c.title || "Chat"}>
+                  {c.title || "New chat"}
+                </span>
+                <button
+                  type="button"
+                  className="chat-sidebar-item-delete"
+                  onClick={e => handleDeleteChat(c.id, e)}
+                  aria-label="Delete chat"
+                  title="Delete this chat"
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+
+      <div className="agent-chat-main">
+        <div className="agent-chat-header">
+          <div>
+            <div className="agent-title">
+              {agentType === "synthetic" ? "Synthetic Data Agent" : "UI Automation Agent"}
+            </div>
+            <div className="agent-description">
+              {agentType === "synthetic"
+                ? "Chat with an agent that crawls your app flows and generates SDV-compatible synthetic data."
+                : "Chat with an agent that plans, generates, heals, and executes Playwright UI tests."}
+            </div>
           </div>
-          <div className="agent-description">
-            {agentType === "synthetic"
-              ? "Chat with an agent that crawls your app flows and generates SDV-compatible synthetic data."
-              : "Chat with an agent that plans, generates, heals, and executes Playwright UI tests."}
-          </div>
+
+          {agentType === "ui-automation" && (
+            <div className="agent-settings">
+              <label className="agent-setting">
+                <span>Script language</span>
+                <select
+                  value={scriptLanguage}
+                  onChange={e => setScriptLanguage(e.target.value as "javascript" | "typescript")}
+                >
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                </select>
+              </label>
+              <label className="agent-setting">
+                <span>Use synthetic data</span>
+                <input
+                  type="checkbox"
+                  checked={useSyntheticData}
+                  onChange={e => setUseSyntheticData(e.target.checked)}
+                />
+              </label>
+            </div>
+          )}
         </div>
 
-        {agentType === "ui-automation" && (
-          <div className="agent-settings">
-            <label className="agent-setting">
-              <span>Script language</span>
-              <select
-                value={scriptLanguage}
-                onChange={e =>
-                  setScriptLanguage(e.target.value as "javascript" | "typescript")
-                }
-              >
-                <option value="javascript">JavaScript</option>
-                <option value="typescript">TypeScript</option>
-              </select>
-            </label>
-            <label className="agent-setting">
-              <span>Use synthetic data</span>
-              <input
-                type="checkbox"
-                checked={useSyntheticData}
-                onChange={e => setUseSyntheticData(e.target.checked)}
-              />
-            </label>
-          </div>
-        )}
-      </div>
+        <div className="agent-chat-body">
+          <ChatMessageList
+            messages={messages}
+            renderPayload={msg => {
+              if (!msg.payload) return null;
+              if (msg.payload.kind === "synthetic") {
+                return <SyntheticResponseCard payload={msg.payload} />;
+              }
+              if (msg.payload.kind === "ui") {
+                return <UiAutomationResponseCard payload={msg.payload} />;
+              }
+              return null;
+            }}
+          />
+        </div>
 
-      <div className="agent-chat-body">
-        <ChatMessageList
-          messages={messages}
-          renderPayload={msg => {
-            if (!msg.payload) return null;
-            if (msg.payload.kind === "synthetic") {
-              return <SyntheticResponseCard payload={msg.payload} />;
-            }
-            if (msg.payload.kind === "ui") {
-              return <UiAutomationResponseCard payload={msg.payload} />;
-            }
-            return null;
-          }}
-        />
-      </div>
-
-      <div className="agent-chat-footer">
-        <ChatInput onSend={handleSend} disabled={isSending} />
+        <div className="agent-chat-footer">
+          <ChatInput onSend={handleSend} disabled={isSending} />
+        </div>
       </div>
     </div>
   );
 };
-
