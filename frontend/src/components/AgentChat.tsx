@@ -74,6 +74,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
   const [isSending, setIsSending] = useState(false);
   const [scriptLanguage, setScriptLanguage] = useState<"javascript" | "typescript">("javascript");
   const [useSyntheticData, setUseSyntheticData] = useState(false);
+  const [visibleBrowser, setVisibleBrowser] = useState(true);
+  const [liveTick, setLiveTick] = useState(0);
+  const [runStage, setRunStage] = useState<string | null>(null);
+  const [liveScreenshotError, setLiveScreenshotError] = useState(false);
 
   const apiBase = getApiBase();
   const apiAgentType = agentTypeForApi(agentType);
@@ -149,6 +153,35 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
     [apiBase, chatId, fetchChats]
   );
 
+  // Poll current run status and live screenshot tick while a UI run is in progress
+  useEffect(() => {
+    if (agentType !== "ui-automation" || !isSending) {
+      setRunStage(null);
+      return;
+    }
+    setLiveScreenshotError(false);
+    const pollStatus = async () => {
+      try {
+        const res = await fetch(`${apiBase}/ui/current-run/status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.running && data.stage) {
+            setRunStage(data.stage);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    pollStatus();
+    const statusInterval = window.setInterval(pollStatus, 2000);
+    const tickInterval = window.setInterval(() => setLiveTick(prev => prev + 1), 2000);
+    return () => {
+      window.clearInterval(statusInterval);
+      window.clearInterval(tickInterval);
+    };
+  }, [agentType, isSending, apiBase]);
+
   const handleSend = useCallback(
     async (text: string, fileText?: string) => {
       if (!text.trim() && !fileText) return;
@@ -218,7 +251,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               use_synthetic_data: useSyntheticData,
               synthetic_run_id: undefined,
               script_language: scriptLanguage,
-              chat_id: chatId ?? undefined
+              chat_id: chatId ?? undefined,
+              visible_browser: visibleBrowser
             })
           });
 
@@ -344,11 +378,62 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
                   onChange={e => setUseSyntheticData(e.target.checked)}
                 />
               </label>
+              <label className="agent-setting">
+                <span>Show browser during run</span>
+                <input
+                  type="checkbox"
+                  checked={visibleBrowser}
+                  onChange={e => setVisibleBrowser(e.target.checked)}
+                />
+              </label>
             </div>
           )}
         </div>
 
         <div className="agent-chat-body">
+          {agentType === "ui-automation" && (
+            <div className="live-view-container">
+              <div className="live-view-header">
+                <span>Live browser view</span>
+                <span className="live-view-status">
+                  {isSending
+                    ? runStage
+                      ? (() => {
+                          const labels: Record<string, string> = {
+                            plan: "Planning…",
+                            generate: "Generating script…",
+                            validate: "Validating…",
+                            execute: "Executing in browser (may take 3–8 min)…",
+                            heal: "Healing & re-running…"
+                          };
+                          return labels[runStage] || `Running (${runStage})…`;
+                        })()
+                      : "Starting…"
+                    : "Idle"}
+                </span>
+              </div>
+              {isSending ? (
+                (runStage === "execute" || runStage === "heal") && !liveScreenshotError ? (
+                  <img
+                    className="live-view-image"
+                    src={`${apiBase}/ui/current-run/live-screenshot?t=${liveTick}`}
+                    alt="Live UI run"
+                    onError={() => setLiveScreenshotError(true)}
+                  />
+                ) : (
+                  <div className="live-view-placeholder">
+                    {runStage
+                      ? "Screenshots will appear when the browser starts. Run can take 3–8 minutes."
+                      : "Starting run…"}
+                  </div>
+                )
+              ) : (
+                <div className="live-view-placeholder">
+                  Start a UI automation run to see the live browser view.
+                </div>
+              )}
+            </div>
+          )}
           <ChatMessageList
             messages={messages}
             renderPayload={msg => {

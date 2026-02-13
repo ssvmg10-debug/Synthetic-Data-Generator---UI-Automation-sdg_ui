@@ -65,6 +65,26 @@ class LocatorRegistry(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+
+class UIElement(Base):
+    """
+    Semantic element registry (Katalon/KaneAI-style).
+    One row per (app_key, page_pattern, intent); selectors stored with success/failure stats.
+    Generator uses these first; Healer updates them when a new selector works.
+    """
+    __tablename__ = "ui_elements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    app_key = Column(String(64), nullable=False, index=True)  # e.g. 'lg', 'hilti' from host
+    page_pattern = Column(String(256), nullable=False, index=True)  # host + first path segment
+    intent = Column(String(64), nullable=False, index=True)  # search_box, cookie_accept, add_to_cart, etc.
+    element_name = Column(String(256), nullable=True)  # human label, optional
+    # JSON array of {selector, source, success_count, failure_count, last_success_at (iso)}
+    selectors = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class UIExecutionRun(Base):
     __tablename__ = "ui_execution_runs"
     

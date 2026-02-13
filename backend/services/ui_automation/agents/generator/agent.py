@@ -14,7 +14,15 @@ def _js_esc(s: str) -> str:
     """Escape string for use inside single-quoted JavaScript string."""
     if s is None:
         return ""
-    return str(s).replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+    # Also escape '/' so names can be safely embedded in JS regex literals: /name/i
+    return (
+        str(s)
+        .replace("\\", "\\\\")
+        .replace("'", "\\'")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("/", "\\/")
+    )
 
 
 # Intent -> AKE map key for prepending AKE-derived selectors
@@ -28,9 +36,17 @@ _INTENT_TO_AKE_KEY = {
 }
 
 
-def _get_selectors_list(step: Dict[str, Any], ake_map: Optional[Dict[str, Any]] = None) -> List[str]:
-    """Return ordered list of selectors to try: AKE for intent first, then step selectors (layered)."""
+def _get_selectors_list(
+    step: Dict[str, Any],
+    ake_map: Optional[Dict[str, Any]] = None,
+    registry_list: Optional[List[str]] = None,
+) -> List[str]:
+    """Return ordered list of selectors to try: registry (Katalon-style) first, then AKE, then step selectors (layered)."""
     out: List[str] = []
+    if registry_list:
+        for s in registry_list[:10]:
+            if s and isinstance(s, str) and s.strip():
+                out.append(s.strip())
     intent = step.get("intent")
     if ake_map and intent and intent in _INTENT_TO_AKE_KEY:
         try:
@@ -56,7 +72,14 @@ def _get_selectors_list(step: Dict[str, Any], ake_map: Optional[Dict[str, Any]] 
         for h in hints[:5]:
             if h and str(h).strip() and str(h).strip() not in out:
                 out.append(str(h).strip())
-    return out[:10]
+    # Dedupe preserving order
+    seen = set()
+    deduped = []
+    for x in out:
+        if x not in seen:
+            seen.add(x)
+            deduped.append(x)
+    return deduped[:12]
 
 
 class GeneratorAgent:
@@ -77,10 +100,11 @@ class GeneratorAgent:
         capture_failure_context: bool = True,
         ake_map: Optional[Dict[str, Any]] = None,
         ake_script: Optional[str] = None,
+        db: Optional[Any] = None,
     ) -> str:
         """Generate Playwright test script from structured plan with layered selectors.
-        When ake_map is provided, AKE-derived selectors for each step intent are tried first.
-        When ake_script is provided, script is injected: run after first goto and use for each step (in-browser AKE).
+        When db is provided, semantic registry (UIElement) selectors are tried first (Katalon-style).
+        When ake_map/ake_script is provided, AKE-derived selectors for each step intent are used next.
         """
         language_normalized = (language or "javascript").lower()
         if language_normalized not in ("javascript", "typescript"):
@@ -107,7 +131,18 @@ class GeneratorAgent:
         data_index = 0
         for step in steps:
             action = step.get('action')
-            
+            registry_list: List[str] = []
+            if db:
+                try:
+                    from services.ui_automation.registry import get_registry_selectors
+                    registry_list = get_registry_selectors(db, url, step.get("intent")) or []
+                except Exception:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    registry_list = []
+
             if action == 'comment':
                 script += f"    // {step.get('description')}\n"
             
@@ -127,30 +162,48 @@ class GeneratorAgent:
                     step_index += 1
             
             elif action == 'click':
-                selectors_list = _get_selectors_list(step, ake_map)
+                selectors_list = _get_selectors_list(step, ake_map, registry_list=registry_list)
                 element_name = step.get('element', 'element')
                 ake_key = _INTENT_TO_AKE_KEY.get(step.get("intent")) if step.get("intent") else None
+                is_cookie_intent = step.get("intent") == "cookie_accept"
                 script += f"    // Click on {element_name} (layered selectors)\n"
                 if selectors_list or ake_script:
-                    script += "    (async () => {\n"
+                    # Ensure we AWAIT the layered click block and capture failure context so healer can act.
+                    script += "    try {\n"
+                    script += "        await (async () => {\n"
                     if ake_script and ake_key:
-                        script += "        const __akeSel = (typeof __akeMap !== 'undefined' && __akeMap && __akeMap['" + _js_esc(ake_key) + "']) ? __akeMap['" + _js_esc(ake_key) + "'].map(x => typeof x === 'string' ? x : (x && x.selector)) : [];\n"
-                        script += "        const __selectors = (__akeSel || []).filter(Boolean).concat(" + json.dumps([_js_esc(s) for s in selectors_list]) + ");\n"
+                        script += "            const __akeSel = (typeof __akeMap !== 'undefined' && __akeMap && __akeMap['" + _js_esc(ake_key) + "']) ? __akeMap['" + _js_esc(ake_key) + "'].map(x => typeof x === 'string' ? x : (x && x.selector)) : [];\n"
+                        script += "            const __selectors = (__akeSel || []).filter(Boolean).concat(" + json.dumps([_js_esc(s) for s in selectors_list]) + ");\n"
                     else:
-                        script += "        const __selectors = " + json.dumps([_js_esc(s) for s in selectors_list]) + ";\n"
-                    script += "        let __clicked = false;\n"
-                    script += "        for (const sel of __selectors) {\n"
-                    script += "            try { await page.locator(sel).first().click({ timeout: 8000 }); __clicked = true; break; } catch (_) {}\n"
-                    script += "        }\n"
-                    script += "        if (!__clicked) {\n"
-                    script += "            try { await page.getByRole('button', { name: /" + _js_esc(element_name) + "/i }).first().click({ timeout: 5000 }); __clicked = true; } catch (_) {}\n"
-                    script += "            if (!__clicked) { try { await page.getByRole('link', { name: /" + _js_esc(element_name) + "/i }).first().click({ timeout: 5000 }); __clicked = true; } catch (_) {} }\n"
-                    script += "            if (!__clicked) { try { await page.click('text=" + _js_esc(element_name) + "', { timeout: 5000 }); __clicked = true; } catch (_) {} }\n"
-                    script += "        }\n"
-                    script += "        if (!__clicked) throw new Error('Click failed for all selectors: ' + __selectors.join(', '));\n"
-                    script += "    })();\n"
+                        script += "            const __selectors = " + json.dumps([_js_esc(s) for s in selectors_list]) + ";\n"
+                    script += "            let __clicked = false;\n"
+                    script += "            for (const sel of __selectors) {\n"
+                    script += "                try { await page.locator(sel).first().click({ timeout: 8000 }); __clicked = true; break; } catch (_) {}\n"
+                    script += "            }\n"
+                    script += "            if (!__clicked) {\n"
+                    script += "                try { await page.getByRole('button', { name: /" + _js_esc(element_name) + "/i }).first().click({ timeout: 5000 }); __clicked = true; } catch (_) {}\n"
+                    script += "                if (!__clicked) { try { await page.getByRole('link', { name: /" + _js_esc(element_name) + "/i }).first().click({ timeout: 5000 }); __clicked = true; } catch (_) {} }\n"
+                    script += "                if (!__clicked) { try { await page.click('text=" + _js_esc(element_name) + "', { timeout: 5000 }); __clicked = true; } catch (_) {} }\n"
+                    script += "            }\n"
+                    if is_cookie_intent:
+                        # Cookie banner is best-effort; don't hard-fail the whole test if not found.
+                        script += "            if (!__clicked) { console.log('Cookie/consent button not found – continuing without explicit accept'); }\n"
+                    else:
+                        script += "            if (!__clicked) throw new Error('Click failed for all selectors: ' + __selectors.join(', '));\n"
+                    script += "        })();\n"
+                    script += "    } catch (e) {\n"
+                    if capture_failure_context:
+                        script += self._failure_context_catch(step_index, "click", element_name)
+                    script += "        throw e;\n"
+                    script += "    }\n"
                 else:
-                    script += f"    await page.getByRole('button', {{ name: /{_js_esc(element_name)}/i }}).first().click({{ timeout: 10000 }});\n"
+                    script += "    try {\n"
+                    script += f"        await page.getByRole('button', {{ name: /{_js_esc(element_name)}/i }}).first().click({{ timeout: 10000 }});\n"
+                    script += "    } catch (e) {\n"
+                    if capture_failure_context:
+                        script += self._failure_context_catch(step_index, "click", element_name)
+                    script += "        throw e;\n"
+                    script += "    }\n"
                 script += "    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});\n"
                 script += "    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});\n"
                 if capture_screenshots:
@@ -158,7 +211,7 @@ class GeneratorAgent:
                     step_index += 1
             
             elif action == 'type':
-                selectors_list = _get_selectors_list(step, ake_map)
+                selectors_list = _get_selectors_list(step, ake_map, registry_list=registry_list)
                 ake_key = _INTENT_TO_AKE_KEY.get(step.get("intent")) if step.get("intent") else None
                 value = step.get('value', '')
                 element_name = step.get('element', 'field')
@@ -173,25 +226,38 @@ class GeneratorAgent:
                 
                 script += f"    // Fill {element_name} (layered selectors)\n"
                 if selectors_list or ake_script:
-                    script += "    (async () => {\n"
+                    # Ensure we AWAIT the layered type/fill block and capture failure context.
+                    script += "    try {\n"
+                    script += "        await (async () => {\n"
                     if ake_script and ake_key:
-                        script += "        const __akeSel = (typeof __akeMap !== 'undefined' && __akeMap && __akeMap['" + _js_esc(ake_key) + "']) ? __akeMap['" + _js_esc(ake_key) + "'].map(x => typeof x === 'string' ? x : (x && x.selector)) : [];\n"
-                        script += "        const __selectors = (__akeSel || []).filter(Boolean).concat(" + json.dumps([_js_esc(s) for s in selectors_list]) + ");\n"
+                        script += "            const __akeSel = (typeof __akeMap !== 'undefined' && __akeMap && __akeMap['" + _js_esc(ake_key) + "']) ? __akeMap['" + _js_esc(ake_key) + "'].map(x => typeof x === 'string' ? x : (x && x.selector)) : [];\n"
+                        script += "            const __selectors = (__akeSel || []).filter(Boolean).concat(" + json.dumps([_js_esc(s) for s in selectors_list]) + ");\n"
                     else:
-                        script += "        const __selectors = " + json.dumps([_js_esc(s) for s in selectors_list]) + ";\n"
-                    script += "        const __val = " + json.dumps(value) + ";\n"
-                    script += "        let __filled = false;\n"
-                    script += "        for (const sel of __selectors) {\n"
-                    script += "            try { const f = page.locator(sel).first(); await f.waitFor({ state: 'visible', timeout: 5000 }); await f.fill(__val); __filled = true; break; } catch (_) {}\n"
-                    script += "        }\n"
-                    script += "        if (!__filled) {\n"
-                    script += "            try { await page.getByLabel(/" + _js_esc(element_name) + "/i).first().fill(__val, { timeout: 5000 }); __filled = true; } catch (_) {}\n"
-                    script += "            if (!__filled) { try { await page.getByPlaceholder(/" + _js_esc(element_name) + "/i).first().fill(__val, { timeout: 5000 }); __filled = true; } catch (_) {} }\n"
-                    script += "        }\n"
-                    script += "        if (!__filled) throw new Error('Fill failed for all selectors: ' + __selectors.join(', '));\n"
-                    script += "    })();\n"
+                        script += "            const __selectors = " + json.dumps([_js_esc(s) for s in selectors_list]) + ";\n"
+                    script += "            const __val = " + json.dumps(value) + ";\n"
+                    script += "            let __filled = false;\n"
+                    script += "            for (const sel of __selectors) {\n"
+                    script += "                try { const f = page.locator(sel).first(); await f.waitFor({ state: 'visible', timeout: 5000 }); await f.fill(__val); __filled = true; break; } catch (_) {}\n"
+                    script += "            }\n"
+                    script += "            if (!__filled) {\n"
+                    script += "                try { await page.getByLabel(/" + _js_esc(element_name) + "/i).first().fill(__val, { timeout: 5000 }); __filled = true; } catch (_) {}\n"
+                    script += "                if (!__filled) { try { await page.getByPlaceholder(/" + _js_esc(element_name) + "/i).first().fill(__val, { timeout: 5000 }); __filled = true; } catch (_) {} }\n"
+                    script += "            }\n"
+                    script += "            if (!__filled) throw new Error('Fill failed for all selectors: ' + __selectors.join(', '));\n"
+                    script += "        })();\n"
+                    script += "    } catch (e) {\n"
+                    if capture_failure_context:
+                        script += self._failure_context_catch(step_index, "type", element_name)
+                    script += "        throw e;\n"
+                    script += "    }\n"
                 else:
-                    script += f"    await page.getByLabel(/{_js_esc(element_name)}/i).first().fill({json.dumps(value)}, {{ timeout: 10000 }});\n"
+                    script += "    try {\n"
+                    script += f"        await page.getByLabel(/{_js_esc(element_name)}/i).first().fill({json.dumps(value)}, {{ timeout: 10000 }});\n"
+                    script += "    } catch (e) {\n"
+                    if capture_failure_context:
+                        script += self._failure_context_catch(step_index, "type", element_name)
+                    script += "        throw e;\n"
+                    script += "    }\n"
                 if capture_screenshots:
                     script += self._screenshot_line(step_index)
                     step_index += 1
@@ -270,29 +336,15 @@ class GeneratorAgent:
         if language == "typescript":
             return f"""import {{ test, expect }} from '@playwright/test';
 
-test.use({{ 
-    headless: false, 
-    slowMo: 500,
-    actionTimeout: 30000,
-    navigationTimeout: 60000
-}});
-
 test('{test_name}', async ({{ page }}) => {{
-    test.setTimeout(180000);
+    test.setTimeout(240000);
     
 """
 
         return f"""const {{ test, expect }} = require('@playwright/test');
 
-test.use({{ 
-    headless: false, 
-    slowMo: 500,
-    actionTimeout: 30000,
-    navigationTimeout: 60000
-}});
-
 test('{test_name}', async ({{ page }}) => {{
-    test.setTimeout(180000);
+    test.setTimeout(240000);
     
 """
     

@@ -12,6 +12,7 @@ from services.synthetic.ui_schema.extractor import UISchemaExtractor
 from services.synthetic.unified_schema.merger import SchemaMerger
 from services.synthetic.sdv_engine.generator import SDVGenerator
 from models import Schema, SyntheticRun, SyntheticData, CrawlCache
+from routers.chats import append_agent_message
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ def parse_test_case_node(state: SyntheticDataState, db: Session) -> Dict[str, An
     logger.info("================================================================================")
     
     test_case = state['test_case']
+    chat_id = state.get("chat_id")
     logger.info(f"📝 Input: {test_case[:100]}...")
     
     # Extract URLs from test case
@@ -65,6 +67,8 @@ def parse_test_case_node(state: SyntheticDataState, db: Session) -> Dict[str, An
     
     if not urls:
         logger.warning("⚠️ No URLs found in test case")
+        if chat_id:
+            append_agent_message(db, chat_id, "Synthetic: no URLs found in test case. Stopping workflow.", None)
         return {
             **state,
             'urls': [],
@@ -72,6 +76,8 @@ def parse_test_case_node(state: SyntheticDataState, db: Session) -> Dict[str, An
         }
     
     logger.info(f"✅ Extracted {len(urls)} URL(s): {urls}")
+    if chat_id:
+        append_agent_message(db, chat_id, f"Synthetic: parsed test case and found {len(urls)} URL(s) for crawling.", {"stage": "parse_test_case", "urls": urls})
     
     return {
         **state,
@@ -91,10 +97,13 @@ def crawl_pages_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:
     
     urls = state['urls']
     test_case = state.get('test_case') or ""
+    chat_id = state.get("chat_id")
     crawled_schemas = {}
     
     for url in urls:
         logger.info("🌐 Crawling: %s", url)
+        if chat_id:
+            append_agent_message(db, chat_id, f"Synthetic: crawling UI at {url} to infer schema…", {"stage": "crawl", "url": url})
         
         cache_entry = db.query(CrawlCache).filter(
             CrawlCache.url == url,
@@ -137,8 +146,12 @@ def crawl_pages_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:
             
         except Exception as e:
             logger.error("❌ Failed to crawl %s: %s", url, e)
+            if chat_id:
+                append_agent_message(db, chat_id, f"Synthetic: crawl failed for {url}: {e}", {"stage": "crawl_error", "url": url})
             crawled_schemas[url] = {"error": str(e)}
     
+    if chat_id:
+        append_agent_message(db, chat_id, "Synthetic: completed crawling for all URLs.", {"stage": "crawl_complete"})
     return {
         **state,
         'crawled_schemas': crawled_schemas,
@@ -156,6 +169,7 @@ def merge_schemas_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]
     
     test_case = state['test_case']
     crawled_schemas = state['crawled_schemas']
+    chat_id = state.get("chat_id")
     
     # Use Azure OpenAI to intelligently merge schemas
     from utils.azure_openai import get_openai_client
@@ -194,6 +208,8 @@ Return JSON:
         raw = response.choices[0].message.content or ""
         merged_schema = _parse_json_from_llm(raw)
         logger.info(f"✅ Merged schema with {len(merged_schema.get('fields', {}))} fields")
+        if chat_id:
+            append_agent_message(db, chat_id, f"Synthetic: merged crawled schemas into unified schema with {len(merged_schema.get('fields', {}))} fields.", {"stage": "merge_schemas"})
         
         # Save schema to database
         db_schema = Schema(source="test_case_crawl", schema_json=merged_schema)
@@ -212,6 +228,8 @@ Return JSON:
         
     except Exception as e:
         logger.error(f"❌ Schema merge failed: {str(e)}")
+        if chat_id:
+            append_agent_message(db, chat_id, f"Synthetic: schema merge failed: {e}", {"stage": "merge_error"})
         return {
             **state,
             'error': f"Schema merge failed: {str(e)}"
@@ -229,6 +247,7 @@ def generate_data_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]
     merged_schema = state['merged_schema']
     num_rows = state.get('num_rows', 10)
     schema_id = state['schema_id']
+    chat_id = state.get("chat_id")
     
     logger.info(f"🎲 Generating {num_rows} rows...")
     
@@ -279,6 +298,8 @@ def generate_data_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]
         logger.info("================================================================================")
         logger.info("🎉 WORKFLOW COMPLETE")
         logger.info("================================================================================")
+        if chat_id:
+            append_agent_message(db, chat_id, f"Synthetic: generated {len(synthetic_data)} rows of data (run #{run.id}).", {"stage": "generate_data", "run_id": run.id, "rows": len(synthetic_data)})
         
         return {
             **state,
@@ -289,6 +310,8 @@ def generate_data_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]
         
     except Exception as e:
         logger.error(f"❌ Data generation failed: {str(e)}")
+        if chat_id:
+            append_agent_message(db, chat_id, f"Synthetic: data generation failed: {e}", {"stage": "generate_error"})
         return {
             **state,
             'error': f"Data generation failed: {str(e)}"

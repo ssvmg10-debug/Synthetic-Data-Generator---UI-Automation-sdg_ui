@@ -1,0 +1,15 @@
+{
+  "source": "ui",
+  "fields": [
+    {
+      "name": "text",
+      "type": "string",
+      "required": false,
+      "label": "Search",
+      "constraints": {
+        "max_length": 50
+      }
+    }
+  ],
+  "total_fields": 1
+}

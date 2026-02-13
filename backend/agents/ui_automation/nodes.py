@@ -68,7 +68,7 @@ def generate_script_node(state: UIAutomationState, db: Session) -> Dict[str, Any
             ake_script = get_ake_script()
         except Exception:
             pass
-        playwright_script = generator.generate(structured_plan, ake_script=ake_script)
+        playwright_script = generator.generate(structured_plan, ake_script=ake_script, db=db)
         
         logger.info("✅ Playwright script generated")
         logger.info(f"📄 Script length: {len(playwright_script)} chars")
@@ -129,6 +129,10 @@ def execute_test_node(state: UIAutomationState, db: Session) -> Dict[str, Any]:
             return {
                 **state,
                 'execution_status': 'passed',
+                'logs': result.get("logs"),
+                'logs_path': result.get("logs_path"),
+                'screenshot_path': result.get("screenshot_path"),
+                'step_screenshots': result.get("step_screenshots", []),
                 'current_step': 'complete'
             }
         else:
@@ -143,6 +147,10 @@ def execute_test_node(state: UIAutomationState, db: Session) -> Dict[str, Any]:
                 'failed_step_index': result.get('failed_step_index'),
                 'failure_url': result.get('failure_url'),
                 'failure_page_elements': result.get('failure_page_elements'),
+                'logs': result.get("logs"),
+                'logs_path': result.get("logs_path"),
+                'screenshot_path': result.get("screenshot_path"),
+                'step_screenshots': result.get("step_screenshots", []),
                 'current_step': 'monitor_execution'
             }
         
@@ -152,6 +160,8 @@ def execute_test_node(state: UIAutomationState, db: Session) -> Dict[str, Any]:
             **state,
             'execution_status': 'failed',
             'error': str(e),
+            'logs': None,
+            'logs_path': None,
             'current_step': 'monitor_execution'
         }
 

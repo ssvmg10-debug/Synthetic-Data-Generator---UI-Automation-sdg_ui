@@ -3,6 +3,7 @@ UI Automation Router
 Endpoints for UI test automation with LangGraph agents
 """
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -15,11 +16,51 @@ from services.ui_automation.agents.validator.agent import ValidatorAgent
 from services.ui_automation.agents.healer.agent import HealerAgent
 from services.ui_automation.engine.executor import PlaywrightExecutor
 from agents.ui_automation.graph import run_ui_automation_workflow
+from datetime import datetime
+from pathlib import Path
+from threading import Lock
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Track the currently running UI test (for live screenshot streaming)
+_current_run_lock: Lock = Lock()
+_current_run: Optional[Dict[str, Any]] = None
+
+
+def _set_current_run(test_case_id: int, stage: str = "plan") -> None:
+    """Register the currently running UI test and optional stage for progress."""
+    global _current_run
+    with _current_run_lock:
+        _current_run = {
+            "test_case_id": test_case_id,
+            "stage": stage,
+            "started_at": datetime.utcnow().isoformat(),
+        }
+
+
+def _update_current_run_stage(stage: str) -> None:
+    """Update the stage of the current run (e.g. generate, validate, execute, heal)."""
+    global _current_run
+    with _current_run_lock:
+        if _current_run is not None:
+            _current_run = {**_current_run, "stage": stage}
+
+
+def _clear_current_run() -> None:
+    """Clear the current run (no UI test in progress)."""
+    global _current_run
+    with _current_run_lock:
+        _current_run = None
+
+
+def _get_current_run() -> Optional[Dict[str, Any]]:
+    """Return a shallow copy of the current run metadata, if any."""
+    with _current_run_lock:
+        return dict(_current_run) if _current_run is not None else None
+
 
 # ========== REQUEST MODELS ==========
 
@@ -31,6 +72,7 @@ class UITestRequest(BaseModel):
     synthetic_run_id: Optional[int] = None
     script_language: Optional[str] = "javascript"
     chat_id: Optional[int] = None  # If set, append to this chat; response includes chat_id
+    visible_browser: Optional[bool] = True  # If false, run Playwright in headless mode
 
 class UIExecuteRequest(BaseModel):
     test_case_id: int
@@ -78,6 +120,9 @@ async def run_ui_automation_workflow_endpoint(request: UITestRequest, db: Sessio
                 "healing_attempts": result['healing_attempts'],
                 "healing_history": result['healing_history'],
                 "script": result['script'],
+                "logs": result.get("logs"),
+                "logs_path": result.get("logs_path"),
+                "step_screenshots": result.get("step_screenshots", []),
                 "message": f"Test passed with {result['healing_attempts']} healing attempts"
             }
         else:
@@ -91,6 +136,9 @@ async def run_ui_automation_workflow_endpoint(request: UITestRequest, db: Sessio
                 "error": result.get('error'),
                 "healing_attempts": result['healing_attempts'],
                 "healing_history": result['healing_history'],
+                "logs": result.get("logs"),
+                "logs_path": result.get("logs_path"),
+                "step_screenshots": result.get("step_screenshots", []),
                 "message": f"Test failed after {result['healing_attempts']} healing attempts"
             }
         
@@ -169,7 +217,7 @@ async def generate_ui_script(request: UIGenerateRequest, db: Session = Depends(g
         
         logger.info(f"🤖 Using Generator Agent to create Playwright script...")
         generator = GeneratorAgent()
-        script = generator.generate(plan)
+        script = generator.generate(plan, db=db)
         
         logger.info(f"✅ Script generated ({len(script)} characters)")
         
@@ -222,7 +270,7 @@ async def execute_ui_test(request: UIExecuteRequest, background_tasks: Backgroun
         if not test_case.script:
             logger.info("📝 No script found, generating new script...")
             generator = GeneratorAgent()
-            script = generator.generate(test_case.structured_json, synthetic_data=request.synthetic_data)
+            script = generator.generate(test_case.structured_json, synthetic_data=request.synthetic_data, db=db)
             test_case.script = {"language": "javascript", "content": script}
             db.commit()
         else:
@@ -279,6 +327,8 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         logger.info("Raw Input: %s...", (request.raw_input[:100] if len(request.raw_input) > 100 else request.raw_input))
         logger.info("Use Synthetic Data: %s", request.use_synthetic_data)
         logger.info("Script Language: %s", request.script_language)
+        headed = True if request.visible_browser is None else bool(request.visible_browser)
+        logger.info("Visible browser (headed mode): %s", headed)
         logger.info("="*80)
 
         # Step 1: Plan
@@ -286,12 +336,14 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         planner = PlannerAgent()
         structured_plan = planner.plan(request.raw_input)
         logger.info("Test plan created with %s steps", len(structured_plan.get("steps", [])))
+        append_agent_message(db, chat_id, f"UI: planned test case into {len(structured_plan.get('steps', []))} steps.", {"stage": "plan", "steps": structured_plan.get("steps", [])})
 
         test_case = UITestCase(raw_input=request.raw_input, structured_json=structured_plan)
         db.add(test_case)
         db.commit()
         db.refresh(test_case)
         logger.info("Test case saved with ID: %s", test_case.id)
+        _set_current_run(test_case.id, stage="plan")
 
         # Step 2: Get synthetic data if needed
         synthetic_data = None
@@ -303,8 +355,11 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             ).all()
             synthetic_data = [d.row_json for d in data_rows]
             logger.info("Loaded %s synthetic data rows", len(synthetic_data))
+            append_agent_message(db, chat_id, f"UI: loaded {len(synthetic_data)} synthetic data rows from run {request.synthetic_run_id}.", {"stage": "load_synthetic", "rows": len(synthetic_data)})
         else:
             logger.info("STEP 2: Skipped - No synthetic data requested")
+            append_agent_message(db, chat_id, "UI: proceeding without external synthetic data.", {"stage": "load_synthetic", "rows": 0})
+        _update_current_run_stage("generate")
 
         # Step 3: Generate script
         logger.info("STEP 3: Generating Playwright script...")
@@ -312,24 +367,35 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         language = (request.script_language or "javascript").lower()
         if language not in ("javascript", "typescript"):
             language = "javascript"
-        script = generator.generate(structured_plan, synthetic_data=synthetic_data, language=language)
+        script = generator.generate(structured_plan, synthetic_data=synthetic_data, language=language, db=db)
         logger.info("Script generated (%s characters)", len(script))
+        append_agent_message(db, chat_id, f"UI: generated Playwright script ({len(script)} characters).", {"stage": "generate_script", "language": language})
 
         # Persist script on test case for traceability
         test_case.script = {"language": language, "content": script}
         db.commit()
+        _update_current_run_stage("validate")
 
         # Step 4: Validate
         logger.info("STEP 4: Validating test plan...")
         validator = ValidatorAgent()
         validation = validator.validate(structured_plan)
         logger.info("Validation complete: %s", validation.get("is_valid", False))
+        append_agent_message(db, chat_id, f"UI: validation {'passed' if validation.get('is_valid', False) else 'completed with issues'}.", {"stage": "validate", "result": validation})
 
         # Step 5: Execute
         logger.info("STEP 5: Executing Playwright script...")
+        append_agent_message(
+            db,
+            chat_id,
+            f"UI: executing Playwright script in {'headed' if headed else 'headless'} browser…",
+            {"stage": "execute_start", "headed": headed},
+        )
         executor = PlaywrightExecutor()
-        result = executor.execute(script, test_case_id=test_case.id)
+        _update_current_run_stage("execute")
+        result = executor.execute(script, test_case_id=test_case.id, headed=headed)
         logger.info("Execution complete - Status: %s", result.get("status"))
+        append_agent_message(db, chat_id, f"UI: initial execution finished with status '{result.get('status')}'.", {"stage": "execute_done", "status": result.get("status"), "error": result.get("error")})
 
         # Step 6: Heal if failed (up to 2 attempts with full context for healer)
         healer = HealerAgent()
@@ -341,6 +407,8 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             if result.get("status") != "failed":
                 break
             logger.info("STEP 6: Self-healing (attempt %s/%s) - Test failed, attempting auto-heal...", attempt + 1, max_heal_attempts)
+            _update_current_run_stage("heal")
+            append_agent_message(db, chat_id, f"UI: healing attempt {attempt + 1}/{max_heal_attempts} for failing step.", {"stage": "heal_attempt", "attempt": attempt + 1, "status": result.get("status"), "error": result.get("error")})
             failed_idx = result.get("failed_step_index")
             # failed_step_index from executor is 1-based; steps before failure = indices 0..failed_idx-2
             steps_before = steps_list[: (failed_idx - 1)] if failed_idx is not None and isinstance(failed_idx, int) and failed_idx >= 1 else None
@@ -359,17 +427,20 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             if healed.get("healed"):
                 logger.info("Healing successful - Re-executing...")
                 current_script = healed.get("script") or current_script
-                result = executor.execute(current_script, test_case_id=test_case.id)
+                result = executor.execute(current_script, test_case_id=test_case.id, headed=headed)
                 result["healed"] = True
                 logger.info("Re-execution complete - Status: %s", result.get("status"))
+                append_agent_message(db, chat_id, f"UI: re-execution after healing finished with status '{result.get('status')}'.", {"stage": "heal_execute_done", "status": result.get("status"), "error": result.get("error")})
             else:
                 logger.warning("Healing failed (no replacement selector found)")
                 break
 
         if result.get("status") == "passed":
             logger.info("STEP 6: Test passed (with or without healing)")
+            append_agent_message(db, chat_id, "UI: test passed (with or without healing).", {"stage": "complete", "status": result.get("status"), "healed": result.get("healed", False)})
         elif result.get("status") == "failed":
             logger.info("STEP 6: Test still failed after healing attempts")
+            append_agent_message(db, chat_id, "UI: test still failed after healing attempts.", {"stage": "complete", "status": result.get("status"), "healed": result.get("healed", False), "error": result.get("error")})
 
         # Save execution
         execution_run = UIExecutionRun(
@@ -402,6 +473,7 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         }
         append_agent_message(db, chat_id, agent_text, payload)
 
+        _clear_current_run()
         return {
             "execution_id": execution_run.id,
             "test_case_id": test_case.id,
@@ -411,12 +483,14 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             "script": script,
             "healed": result.get("healed", False),
             "logs": result.get("logs"),
+            "logs_path": result.get("logs_path"),
             "screenshot": result.get("screenshot_path"),
             "step_screenshots": result.get("step_screenshots", []),
             "message": "UI test completed",
             "chat_id": chat_id,
         }
     except HTTPException:
+        _clear_current_run()
         raise
     except Exception as e:
         logger.error("="*80)
@@ -429,6 +503,7 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
                 append_agent_message(db, chat_id, "Sorry, something went wrong: %s" % str(e), None)
             except Exception:
                 pass
+        _clear_current_run()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/results/{execution_id}")
@@ -449,6 +524,43 @@ async def get_ui_results(execution_id: int, db: Session = Depends(get_db)):
         "created_at": execution.created_at,
         "test_plan": test_case.structured_json if test_case else None
     }
+
+
+@router.get("/current-run/status")
+async def get_current_run_status():
+    """Return current run progress so the frontend can show Planning / Generating / Executing etc."""
+    current = _get_current_run()
+    if not current:
+        return {"running": False, "stage": None, "test_case_id": None}
+    return {
+        "running": True,
+        "stage": current.get("stage") or "plan",
+        "test_case_id": current.get("test_case_id"),
+    }
+
+
+@router.get("/current-run/live-screenshot")
+async def get_current_run_live_screenshot():
+    """Return latest step screenshot for the current UI run (for in-app live view)."""
+    current = _get_current_run()
+    if not current:
+        raise HTTPException(status_code=404, detail="No UI run in progress")
+
+    test_case_id = current.get("test_case_id")
+    if not isinstance(test_case_id, int):
+        raise HTTPException(status_code=404, detail="No UI run in progress")
+
+    backend_root = Path(__file__).resolve().parent.parent
+    screenshot_dir = backend_root / "test_outputs" / f"run_{test_case_id}" / "step_screenshots"
+    if not screenshot_dir.exists():
+        raise HTTPException(status_code=404, detail="No screenshots yet")
+
+    png_files = sorted(screenshot_dir.glob("step_*.png"))
+    if not png_files:
+        raise HTTPException(status_code=404, detail="No screenshots yet")
+
+    latest = png_files[-1]
+    return FileResponse(latest, media_type="image/png")
 
 @router.get("/locators")
 async def get_locator_registry(db: Session = Depends(get_db)):

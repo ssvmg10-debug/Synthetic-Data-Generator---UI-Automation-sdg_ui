@@ -1,9 +1,59 @@
 # Implementation Plan: Achieve 100% UI Automation
 
-This plan addresses two core ideas:
+**See also:** [Visible Browser & In-App Live View (Cursor IDE–style)](./VISIBLE_BROWSER_AND_LIVE_VIEW_PLAN.md) — optional visible browser during runs and in-app live view.
+
+This plan addresses:
 
 1. **Give the healer full test-case context** – including the whole test case, which step failed, and what previous steps had already run – so healing is context-aware.
 2. **UI crawl before UI automation** – run a test-case-driven crawl, then feed the crawl response (per-step page structure) into planning, generation, and healing so selectors match real pages.
+3. **Industry alignment** – incorporate patterns from **KaneAI** (TestMu AI), **testRigor**, and **Katalon** to reach maximum execution accuracy and maintainability.
+
+---
+
+## Industry Reference: KaneAI, testRigor, Katalon
+
+### KaneAI ([TestMu AI](https://www.testmuai.com/lp/kane-ai/))
+
+- **Intent-level understanding**: Tests authored in natural language; platform maps to semantic intents (search, cart, checkout) rather than brittle selectors.
+- **Semantic element model**: Internal model of “search box on LG home”, “Add to Cart on PDP”; each backed by multiple locators, learned and updated over time.
+- **Auto-healing memory**: Successful selectors persisted and reused for same page + intent; LLM suggests alternatives when failed, then results are stored.
+- **Real-time progress**: Live status (“planning”, “authoring”, “executing”, “healing”) so users see where the run is.
+
+**Our alignment:** Intent-based steps (PlannerAgent), layered selectors, LocatorRegistry + healing memory, AKE (DOM-derived selectors), chat-based progress. **Gap:** No first-class “semantic element” with multiple ranked selectors and success/failure stats.
+
+---
+
+### testRigor ([testrigor.com](https://testrigor.com))
+
+- **Plain English → automated steps**: High-level instructions (e.g. “purchase a Kindle”) converted into detailed steps (search, click product, add to cart).
+- **Strong maintenance claim**: 99.5% reduction vs manual Selenium/Appium; 90%+ coverage in under a year.
+- **No-code**: Create tests from scratch, or generate from AI based on descriptions, or generate working tests using AI.
+
+**Our alignment:** NL → Planner → structured plan → Generator → Playwright script; multi-step flows. **Gap:** We don’t yet have a single “semantic element” registry with multiple locators and prioritization like testRigor’s internal model.
+
+---
+
+### Katalon ([katalon.com](https://katalon.com))
+
+- **TrueTest – agentic from real behavior**: JS agent on the app (MutationObserver + listeners) captures real user/agent actions → journey maps → autonomous test generation → self-maintaining test objects. Coverage gap detection by comparing behavior across environments. ([TrueTest](https://katalon.com/truetest), [Autonomous test generation](https://docs-dev.katalon.com/katalon-platform/proof-of-concept/autonomous-test-generation/autonomous-test-generation-with-katalon-truetest))
+- **Object repository + locator priorities**: Test objects stored with multiple locators; configurable priority (id, css, xpath). **Classic self-healing**: on failure, try other known locators for that object; if one works, suggest replacing the broken one. **AI self-healing**: if classic fails, LLM analyzes page source, a11y tree, full-page and element screenshots to find the element. ([Self-healing](https://docs.katalon.com/katalon-studio/maintain-tests/self-healing-tests-in-katalon-studio))
+- **Time Capsule**: On failure (e.g. broken locator), restore app state and recapture/update objects from the failed run.
+- **StudioAssist**: NL → code (Ask mode); Agent mode with MCP for multi-step creation. AI failure analysis (stack trace → root cause). Multiple AI providers (OpenAI, Azure, etc.). ([StudioAssist](https://docs.katalon.com/katalon-studio/studioassist/studioassist-overview))
+
+**Our alignment:** We have classic-style “try alternatives” + LLM healer with full context; failure context (step, URL, elements) and screenshots; NL → plan → script. **Gaps:** (1) No central **object repository** with multiple locators per semantic element and **priority order**. (2) No **success/failure stats** per locator to prefer best-performing. (3) No “Time Capsule” flow to recapture from failed run (we have screenshots + failure_context; could add “suggest update from this run”). (4) No behavior-capture agent (TrueTest-style); optional future.
+
+---
+
+## Updated Implementation Pillars (from all three)
+
+| Pillar | KaneAI/testRigor | Katalon | Our implementation |
+|--------|-------------------|---------|---------------------|
+| **Semantic elements** | Intent + “search box on LG home” | Object repository, multiple locators per object | **Phase 1+**: UIElement table (app_key, page_pattern, intent, selectors[] with success/fail counts). Generator/Healer use it first. |
+| **Locator priority** | Best locator first from memory | id → css → xpath configurable | **Phase 1+**: Selectors ordered by success rate and last_success_at; try registry before AKE and generic. |
+| **Classic + AI healing** | Memory then LLM | Classic (try other locators) then AI (LLM + page/screenshots) | **Done**: Registry/memory → alternatives → LLM with context. Optional: add screenshot to LLM input (AI self-healing). |
+| **Real-time progress** | Planning / authoring / executing / healing | TestOps execution view | **Done**: Chat messages per stage (synthetic + UI). Optional: `/workflow-status/{run_id}`. |
+| **Crawl / real structure** | — | — | **Done**: Crawl-first, crawl_snapshots, failure_context. |
+| **Failure recapture** | — | Time Capsule: restore state, recapture | **Optional**: On failure, return logs_path + screenshot + failure_context; UI or script can “re-run from step” or suggest object update. |
 
 ---
 
@@ -80,6 +130,27 @@ This plan addresses two core ideas:
 │    ... Page URL: ... Elements on page: ... Failed selector: ..."            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Phase 1+ (Semantic Element Registry – Katalon/KaneAI-style)
+
+**Goal:** One registry of semantic elements per (app, page, intent) with multiple selectors and success/failure stats. Generator tries registry first; Healer updates registry when a new selector works.
+
+**Deliverables:**
+
+1. **UIElement model** (optional new table or extend LocatorRegistry):
+   - `app_key` (e.g. `lg`, `hilti` from URL host), `page_pattern` (host + first path), `intent` (search_box, cookie_accept, add_to_cart, …), `element_name` (human label).
+   - `selectors` JSON: array of `{selector, source, success_count, failure_count, last_success_at}`. Order by success rate / recency when reading.
+   - On heal success: append or update selector with source `healer` and bump success; on repeated failure demote or prune.
+
+2. **Generator**: For each step, resolve `(app_key, page_pattern, intent)` from plan URL and step intent. Query UIElement; prepend registry selectors to AKE + generic list. No new API; internal lookup.
+
+3. **Healer**: When healing succeeds, write back to UIElement: add or update the working selector, increment success_count, set last_success_at. Next run will prefer it (Katalon “smart locators”).
+
+4. **Migration**: Add table if new, or add columns to LocatorRegistry and backfill from existing `element` (url_pattern::intent) and `primary_locator` / `healed_locators`.
+
+**Success criteria:** First run may use AKE/heuristics; after one successful heal, next run uses saved selector first. Registry is used before generic heuristics in both Generator and Healer.
 
 ---
 

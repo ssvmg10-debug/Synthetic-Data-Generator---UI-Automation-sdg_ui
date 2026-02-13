@@ -163,6 +163,17 @@ class HealerAgent:
         # Persist to healing memory (url_pattern + intent) for future runs
         if healed and used_selector and url_pattern and intent:
             self._save_healing_memory(db, url_pattern, intent, used_selector)
+            # Also save to semantic UIElement registry (Katalon-style) for Generator to use next run
+            try:
+                from services.ui_automation.registry import save_healed_selector
+                full_url = failure_url or (plan.get("url") if plan else "") or ""
+                if full_url:
+                    save_healed_selector(db, full_url, intent, used_selector)
+            except Exception:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
         return result
 
     def _get_intent_and_url_pattern(

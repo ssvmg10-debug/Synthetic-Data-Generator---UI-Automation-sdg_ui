@@ -72,11 +72,12 @@ async def generate_from_natural_language(request: NaturalLanguageRequest, db: Se
             db, request.chat_id, "synthetic", request.user_input
         )
 
-        # Run LangGraph workflow
+        # Run LangGraph workflow (with progress-aware chat_id)
         result = await run_synthetic_data_workflow(
             test_case=request.user_input,
             num_rows=10,  # Default, can be parsed from user input
-            db=db
+            db=db,
+            chat_id=chat_id,
         )
         
         if result['status'] == 'success':
@@ -205,7 +206,7 @@ async def generate_from_natural_language_legacy(request: NaturalLanguageRequest,
         logger.info(f"✅ Generated {len(synthetic_data)} rows")
         
         # Save run
-run = SyntheticRun(schema_id=db_schema.id, rows=num_rows, model=request.model_name)
+        run = SyntheticRun(schema_id=db_schema.id, rows=num_rows, model=request.model_name)
         db.add(run)
         db.commit()
         db.refresh(run)
@@ -388,7 +389,7 @@ async def generate_synthetic_data(request: GenerateDataRequest, db: Session = De
         logger.info(f"✅ Successfully generated {len(synthetic_data)} rows of data")
         
         # Save run info
-run = SyntheticRun(schema_id=schema_id, rows=request.num_rows, model=request.model_name)
+        run = SyntheticRun(schema_id=schema_id, rows=request.num_rows, model=request.model_name)
         db.add(run)
         db.commit()
         db.refresh(run)

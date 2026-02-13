@@ -19,7 +19,7 @@ then click on continue with this condition (complete purchase as guest),
 then fill billing/shipping details"""
 
 
-def post(path, body):
+def post(path, body, timeout=300):
     req = urllib.request.Request(
         f"{BASE}{path}",
         data=json.dumps(body).encode("utf-8"),
@@ -27,7 +27,7 @@ def post(path, body):
         method="POST",
     )
     try:
-        resp = urllib.request.urlopen(req, timeout=300)
+        resp = urllib.request.urlopen(req, timeout=timeout)
         return resp.status, json.loads(resp.read().decode("utf-8", "replace"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")
@@ -59,7 +59,7 @@ def main():
         print(f"    Error: {data.get('error') or data.get('detail', data)}")
     print()
 
-    # 2) UI Automation
+    # 2) UI Automation (long timeout: executor can take up to ~420s)
     print("[2] UI Automation Agent: POST /ui/run")
     status2, data2 = post(
         "/ui/run",
@@ -68,12 +68,17 @@ def main():
             "use_synthetic_data": False,
             "script_language": "javascript",
         },
+        timeout=500,
     )
     print(f"    Status: {status2}")
     if status2 == 200:
         print(f"    Execution ID: {data2.get('execution_id')}, Status: {data2.get('status')}, Healed: {data2.get('healed')}")
         if data2.get("plan", {}).get("steps"):
             print(f"    Plan steps: {len(data2['plan']['steps'])}")
+        if data2.get("logs_path"):
+            print(f"    Logs: {data2['logs_path']}")
+        if data2.get("step_screenshots"):
+            print(f"    Screenshots: {len(data2['step_screenshots'])} steps")
     else:
         print(f"    Error: {data2.get('error') or data2.get('detail', data2)}")
     print("=" * 60)

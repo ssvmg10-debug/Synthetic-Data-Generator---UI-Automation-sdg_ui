@@ -153,7 +153,10 @@ async def run_ui_automation_workflow(test_case: str, db: Session, max_healing_at
                 'testcase_id': result.get('testcase_id'),
                 'healing_attempts': healing_attempts,
                 'healing_history': result.get('healing_history', []),
-                'script': result.get('playwright_script')
+                'script': result.get('playwright_script'),
+                'logs': result.get('logs'),
+                'logs_path': result.get('logs_path'),
+                'step_screenshots': result.get('step_screenshots', []),
             }
         else:
             logger.error("=" * 80)
@@ -164,7 +167,10 @@ async def run_ui_automation_workflow(test_case: str, db: Session, max_healing_at
                 'status': 'failed',
                 'error': result.get('error'),
                 'healing_attempts': healing_attempts,
-                'healing_history': result.get('healing_history', [])
+                'healing_history': result.get('healing_history', []),
+                'logs': result.get('logs'),
+                'logs_path': result.get('logs_path'),
+                'step_screenshots': result.get('step_screenshots', []),
             }
         
     except Exception as e:

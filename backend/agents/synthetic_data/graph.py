@@ -52,7 +52,7 @@ def create_synthetic_data_graph(db: Session):
     return app
 
 
-async def run_synthetic_data_workflow(test_case: str, num_rows: int, db: Session):
+async def run_synthetic_data_workflow(test_case: str, num_rows: int, db: Session, chat_id: int | None = None):
     """
     Execute the synthetic data generation workflow
     """
@@ -75,7 +75,8 @@ async def run_synthetic_data_workflow(test_case: str, num_rows: int, db: Session
         'run_id': None,
         'error': None,
         'current_step': 'parse_test_case',
-        'thread_id': None
+        'thread_id': None,
+        'chat_id': chat_id,
     }
     
     # Run workflow

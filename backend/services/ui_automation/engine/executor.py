@@ -28,6 +28,7 @@ class PlaywrightExecutor:
         script: str,
         test_case_id: int,
         capture_step_screenshots: bool = True,
+        headed: bool = True,
     ) -> Dict[str, Any]:
         """Execute Playwright script. Sets SCREENSHOT_DIR for per-step screenshots and returns step_screenshots."""
         logger.info("Starting test execution for test case %s", test_case_id)
@@ -39,12 +40,17 @@ class PlaywrightExecutor:
         logs_path = run_dir / "logs.txt"
 
         try:
-            headed_script = script.replace(
-                "test('",
-                "test.use({ headless: false, slowMo: 500 });\n\ntest('",
+            # Remove test.use({ ... }); from script if present (Playwright Test disallows it in test file)
+            import re
+            script_clean = re.sub(
+                r"\s*test\.use\s*\(\s*\{.*?\}\s*\)\s*;\s*\n*",
+                "\n",
+                script,
+                count=1,
+                flags=re.DOTALL,
             )
             with open(test_file, "w") as f:
-                f.write(headed_script)
+                f.write(script_clean)
 
             backend_root = _backend_dir()
             node_bin_path = backend_root / "node_modules" / ".bin"
@@ -56,16 +62,21 @@ class PlaywrightExecutor:
             env["SCREENSHOT_DIR"] = str(screenshot_dir.absolute())
             failure_context_path = run_dir / "failure_context.json"
             env["FAILURE_CONTEXT_PATH"] = str(failure_context_path.absolute())
+            # Isolate test run to this run_dir only (avoids config/test version issues)
+            run_dir_rel = test_file.parent.relative_to(backend_root).as_posix()
+            env["RUN_DIR"] = run_dir_rel
 
-            # Use npx so local node_modules/@playwright/test is used
-            cmd = f'npx playwright test "{test_file_rel}" --reporter=line --headed'
+            # Use minimal executor config so only this run's test file is loaded
+            config_rel = "playwright.executor.config.js"
+            headed_flag = "--headed" if headed else "--headless"
+            cmd = f'npx playwright test "{test_file_rel}" --config={config_rel} --reporter=line {headed_flag}'
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=180,
+                timeout=420,
                 cwd=str(cwd),
                 shell=True,
                 env=env,
@@ -132,14 +143,23 @@ class PlaywrightExecutor:
                 "failed_selector": failed_selector,
             }
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
+            # Capture partial output on timeout and persist logs for debugging.
+            timeout_logs = f"STDOUT:\\n{getattr(e, 'stdout', '') or ''}\\n\\nSTDERR:\\n{getattr(e, 'stderr', '') or ''}\\n\\nExit Code: timeout"
+            logs_path_str = None
+            try:
+                with open(logs_path, "w", encoding="utf-8", errors="replace") as f:
+                    f.write(timeout_logs)
+                logs_path_str = str(logs_path)
+            except Exception:
+                pass
             return {
                 "status": "failed",
-                "logs": "Test execution timed out",
-                "logs_path": None,
+                "logs": timeout_logs or "Test execution timed out",
+                "logs_path": logs_path_str,
                 "screenshot_path": None,
                 "step_screenshots": [],
-                "error": "Timeout after 180 seconds",
+                "error": "Timeout after 420 seconds",
             }
         except Exception as e:
             return {
