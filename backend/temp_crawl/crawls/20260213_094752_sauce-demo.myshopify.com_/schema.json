@@ -1,0 +1,27 @@
+{
+  "source": "ui",
+  "fields": [
+    {
+      "name": "type",
+      "type": "string",
+      "required": false,
+      "label": "type",
+      "constraints": {}
+    },
+    {
+      "name": "search-submit",
+      "type": "string",
+      "required": false,
+      "label": "Unknown",
+      "constraints": {}
+    },
+    {
+      "name": "q",
+      "type": "string",
+      "required": false,
+      "label": "Search",
+      "constraints": {}
+    }
+  ],
+  "total_fields": 3
+}

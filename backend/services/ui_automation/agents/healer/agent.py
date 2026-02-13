@@ -1,6 +1,7 @@
 """
 UI Test Healer Agent – Enterprise-grade self-healing (testRigor-level)
 Multi-strategy: registry, CSS alternatives, getByRole/getByLabel, XPath, text/aria fallbacks.
+ENHANCED: Now includes fuzzy text matching for "grey shirt" vs "Grey jacket" mismatches.
 """
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
@@ -9,6 +10,15 @@ import json
 import logging
 import os
 from datetime import datetime
+
+# PHASE 1 ENHANCEMENT: Import fuzzy matcher
+try:
+    from services.ui_automation.utils.fuzzy_matcher import FuzzyMatcher
+    FUZZY_MATCHER_AVAILABLE = True
+except ImportError:
+    FUZZY_MATCHER_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("FuzzyMatcher not available - fuzzy text matching disabled")
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +30,14 @@ def _js_esc(s: Optional[str]) -> str:
 
 
 class HealerAgent:
-    def __init__(self, use_playwright_agents: bool = True):
+    def __init__(self, use_playwright_agents: bool = True, fuzzy_threshold: float = 0.65):
+        """
+        Initialize Healer Agent with optional fuzzy matching.
+        
+        Args:
+            use_playwright_agents: Use Playwright test agents
+            fuzzy_threshold: Threshold for fuzzy text matching (0.0-1.0)
+        """
         if use_playwright_agents:
             try:
                 from services.ui_automation.agents.playwright_test_agents import PlaywrightTestAgents
@@ -30,6 +47,13 @@ class HealerAgent:
                 self.pw_agents = None
         else:
             self.pw_agents = None
+        
+        # PHASE 1 ENHANCEMENT: Initialize fuzzy matcher
+        if FUZZY_MATCHER_AVAILABLE:
+            self.fuzzy_matcher = FuzzyMatcher(threshold=fuzzy_threshold)
+            logger.info(f"Healer initialized with fuzzy matching (threshold={fuzzy_threshold})")
+        else:
+            self.fuzzy_matcher = None
 
     def heal(
         self,
@@ -125,6 +149,19 @@ class HealerAgent:
                     used_selector = alt
                     strategy_used = "alternative"
                     break
+        
+        # PHASE 1 ENHANCEMENT: 2.5) Fuzzy match using failure_page_elements
+        if not healed and failure_page_elements and self.fuzzy_matcher:
+            fuzzy_alt = self._fuzzy_match_from_page_elements(failed, failure_page_elements)
+            if fuzzy_alt:
+                replaced = _replace(script, failed, fuzzy_alt)
+                if replaced:
+                    healed_script = replaced
+                    healing_actions.append(f"FuzzyMatch: '{failed}' -> '{fuzzy_alt}'")
+                    healed = True
+                    used_selector = fuzzy_alt
+                    strategy_used = "fuzzy"
+        
         # 3) LLM with full test-case context (or fallback to context-free LLM)
         if not healed and os.getenv("AZURE_API_KEY"):
             if test_case_context or plan or steps_before_failure is not None:
@@ -337,6 +374,154 @@ class HealerAgent:
         except Exception as e:
             logger.warning("LLM selector suggestion failed: %s", e)
         return []
+
+    def _fuzzy_match_from_page_elements(
+        self,
+        failed_selector: str,
+        failure_page_elements: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """
+        PHASE 1 ENHANCEMENT: Use fuzzy matching to find alternative selector from page elements.
+        
+        Handles cases like:
+        - Failed selector: "button:has-text('grey shirt')" 
+        - Page actually has: "Grey jacket" button
+        - Fuzzy match finds similarity and suggests correct selector
+        
+        Args:
+            failed_selector: The selector that didn't work
+            failure_page_elements: Elements that were on the page at time of failure
+        
+        Returns:
+            Alternative selector if fuzzy match found, None otherwise
+        """
+        if not self.fuzzy_matcher or not failure_page_elements:
+            return None
+        
+        try:
+            # Extract target text from failed selector
+            target_text = self._extract_target_text_from_selector(failed_selector)
+            if not target_text:
+                logger.debug(f"Could not extract target text from selector: {failed_selector}")
+                return None
+            
+            # Extract candidate texts from page elements
+            candidate_texts = []
+            for el in failure_page_elements:
+                # Get all text fields from element
+                for text_field in ['text', 'ariaLabel', 'placeholder', 'name', 'value']:
+                    text = el.get(text_field)
+                    if text and isinstance(text, str) and text.strip():
+                        candidate_texts.append(text.strip())
+            
+            if not candidate_texts:
+                logger.debug("No candidate texts found in page elements")
+                return None
+            
+            # Find best fuzzy match
+            match_result = self.fuzzy_matcher.find_best_match(target_text, candidate_texts)
+            
+            if not match_result:
+                logger.debug(f"No fuzzy match found for '{target_text}' in page elements")
+                return None
+            
+            matched_text, score = match_result
+            
+            # Generate new selector using matched text
+            new_selector = self._generate_selector_for_matched_text(
+                matched_text,
+                failed_selector,
+                failure_page_elements
+            )
+            
+            if new_selector:
+                logger.info(
+                    f"✅ Fuzzy match: '{target_text}' → '{matched_text}' "
+                    f"(score: {score:.2f}) → selector: '{new_selector}'"
+                )
+                return new_selector
+            
+            return None
+        
+        except Exception as e:
+            logger.error(f"Error in fuzzy matching: {e}", exc_info=True)
+            return None
+    
+    def _extract_target_text_from_selector(self, selector: str) -> Optional[str]:
+        """
+        Extract intended text from a Playwright selector.
+        
+        Examples:
+            ":has-text('grey shirt')" -> "grey shirt"
+            "button:has-text('Add to Cart')" -> "Add to Cart"
+            "getByText('Login')" -> "Login"
+            "text='Search'" -> "Search"
+        """
+        if not selector:
+            return None
+        
+        # Try :has-text()
+        match = re.search(r":has-text\(['\"](.+?)['\"]\)", selector)
+        if match:
+            return match.group(1)
+        
+        # Try text=
+        match = re.search(r"text=['\"](.+?)['\"]", selector)
+        if match:
+            return match.group(1)
+        
+        # Try getByText
+        match = re.search(r"getByText\(['\"](.+?)['\"]\)", selector)
+        if match:
+            return match.group(1)
+        
+        # Try aria-label
+        match = re.search(r"aria-label=['\"](.+?)['\"]", selector)
+        if match:
+            return match.group(1)
+        
+        # Try placeholder
+        match = re.search(r"placeholder=['\"](.+?)['\"]", selector)
+        if match:
+            return match.group(1)
+        
+        return None
+    
+    def _generate_selector_for_matched_text(
+        self,
+        matched_text: str,
+        original_selector: str,
+        page_elements: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        """
+        Generate a new Playwright selector for the fuzzy-matched text.
+        
+        Tries to preserve the selector type from original (button, input, etc.)
+        and use the matched text.
+        """
+        # Escape text for selector
+        escaped_text = matched_text.replace("'", "\\'").replace('"', '\\"')
+        
+        # Find the element in page_elements that matches the text
+        element_type = None
+        for el in page_elements:
+            if any(el.get(field) == matched_text for field in ['text', 'ariaLabel', 'placeholder', 'name']):
+                element_type = el.get('tag', '').lower()
+                aria_label = el.get('ariaLabel')
+                break
+        
+        # If original selector had a tag, preserve it
+        tag_match = re.match(r'^(\w+)', original_selector)
+        if tag_match:
+            tag = tag_match.group(1)
+            return f"{tag}:has-text('{escaped_text}')"
+        
+        # Use aria-label if available
+        if aria_label:
+            return f"[aria-label='{escaped_text}']"
+        
+        # Default to :has-text()
+        return f":has-text('{escaped_text}')"
 
     def _generate_alternative_selectors(self, failed_selector: str) -> List[str]:
         """Generate multiple fallback selectors (CSS, role, label, placeholder, XPath, text)."""

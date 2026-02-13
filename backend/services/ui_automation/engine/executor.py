@@ -70,13 +70,15 @@ class PlaywrightExecutor:
             config_rel = "playwright.executor.config.js"
             headed_flag = "--headed" if headed else "--headless"
             cmd = f'npx playwright test "{test_file_rel}" --config={config_rel} --reporter=line {headed_flag}'
+            
+            # PHASE 1 ENHANCEMENT: Reduced timeout from 600s to 120s (fail fast)
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=420,
+                timeout=120,  # Reduced from 600s
                 cwd=str(cwd),
                 shell=True,
                 env=env,

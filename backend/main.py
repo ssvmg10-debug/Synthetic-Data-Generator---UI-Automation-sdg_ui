@@ -4,23 +4,34 @@ Single backend service running on port 8000
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from routers import synthetic_data, ui_automation, api_automation, chats
+from routers import synthetic_data, ui_automation, api_automation, chats, run_status
 import logging
 import sys
 import os
+import asyncio
 
-# Configure logging to show in console (stdout so you see it in the terminal)
+# Fix for Windows: Use ProactorEventLoop for Playwright subprocess support
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+# Configure logging to show in console and file
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "uvicorn.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.StreamHandler(sys.stdout)
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(log_file, encoding="utf-8")
     ]
 )
 # Ensure uvicorn logs also go to same format
 logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
+logger.info(f"Logging to file: {log_file}")
 
 app = FastAPI(
     title="Enterprise Test Automation Platform",
@@ -54,6 +65,7 @@ app.include_router(synthetic_data.router, prefix="/synthetic", tags=["Synthetic 
 app.include_router(ui_automation.router, prefix="/ui", tags=["UI Automation"])
 app.include_router(api_automation.router, prefix="/api", tags=["API Automation"])
 app.include_router(chats.router, prefix="/chats", tags=["Chats"])
+app.include_router(run_status.router, prefix="/run-status", tags=["Run Status"])
 # app.include_router(integrated_testing.router)  # TODO: Fix model imports
 
 @app.on_event("startup")
@@ -75,7 +87,8 @@ async def root():
             "synthetic": "/synthetic/*",
             "ui_automation": "/ui/*",
             "api_automation": "/api/*",
-            "chats": "/chats/*"
+            "chats": "/chats/*",
+            "run_status": "/run-status/*"
         }
     }
 

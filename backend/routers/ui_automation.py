@@ -16,10 +16,18 @@ from services.ui_automation.agents.validator.agent import ValidatorAgent
 from services.ui_automation.agents.healer.agent import HealerAgent
 from services.ui_automation.engine.executor import PlaywrightExecutor
 from agents.ui_automation.graph import run_ui_automation_workflow
+
+# NEW PHASE 1-3 MODULES
+from services.ui_automation.utils.selector_validator import SelectorValidator
+from services.ui_automation.utils.fuzzy_matcher import FuzzyMatcher
+from services.ui_automation.run_status import get_or_create_tracker, ExecutionPhase
+from services.ui_automation.engine.enhanced_executor import EnhancedExecutor, ExecutionResult
+
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -391,60 +399,109 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         logger.info("Validation complete: %s", validation.get("is_valid", False))
         append_agent_message(db, chat_id, f"UI: validation {'passed' if validation.get('is_valid', False) else 'completed with issues'}.", {"stage": "validate", "result": validation})
 
-        # Step 5: Execute
-        logger.info("STEP 5: Executing Playwright script...")
+        # Step 5: PRE-VALIDATE selectors (NEW Phase 1)
+        logger.info("STEP 5a: Pre-validating selectors against actual page...")
+        url = structured_plan.get("url") or "https://sauce-demo.myshopify.com/"
+        
+        # Convert script steps to validator format
+        steps_for_validation = []
+        for step in structured_plan.get("steps", []):
+            action = step.get("intent", "")
+            selector = step.get("selector", "")
+            if selector and action in ["click", "fill", "select"]:
+                steps_for_validation.append({
+                    "action": action,
+                    "selector": selector,
+                    "value": step.get("value", "")
+                })
+        
+        if steps_for_validation:
+            try:
+                validator = SelectorValidator(headless=not headed)
+                validation_result = await validator.validate_script(url, steps_for_validation)
+                logger.info("Pre-validation: %d valid, %d invalid, %d fixed", 
+                           validation_result['valid_count'], 
+                           validation_result['invalid_count'], 
+                           validation_result['fixed_count'])
+                append_agent_message(db, chat_id, 
+                    f"UI: pre-validated selectors - {validation_result['fixed_count']} selectors auto-fixed.",
+                    {"stage": "pre_validate", "result": validation_result})
+            except Exception as e:
+                logger.warning("Pre-validation failed: %s", str(e))
+        
+        # Step 5b: Execute with NEW EnhancedExecutor (NEW Phase 3)
+        logger.info("STEP 5b: Executing with EnhancedExecutor (intelligent retry + healing)...")
         append_agent_message(
             db,
             chat_id,
-            f"UI: executing Playwright script in {'headed' if headed else 'headless'} browser…",
+            f"UI: executing with enhanced executor in {'headed' if headed else 'headless'} browser…",
             {"stage": "execute_start", "headed": headed},
         )
-        executor = PlaywrightExecutor()
+        
+        # Generate unique run ID for tracking
+        run_id = f"run_{test_case.id}_{uuid.uuid4().hex[:8]}"
+        
+        # Convert script to EnhancedExecutor format
+        enhanced_script = {
+            "starting_url": url,
+            "steps": []
+        }
+        for step in structured_plan.get("steps", []):
+            action = step.get("intent", "click")
+            selector = step.get("selector", "")
+            value = step.get("value", "")
+            
+            if action in ["navigate", "goto"]:
+                enhanced_script["steps"].append({
+                    "action": "goto",
+                    "selector": "",
+                    "value": value or url
+                })
+            elif selector:
+                enhanced_script["steps"].append({
+                    "action": action,
+                    "selector": selector,
+                    "value": value,
+                    "alternatives": []  # Could add alternatives here
+                })
+        
+        # Use EnhancedExecutor instead of old executor
+        executor = EnhancedExecutor(
+            run_id=run_id,
+            headless=not headed,
+            screenshot_dir=f"screenshots/{test_case.id}",
+            enable_healing=True,
+            max_retries_per_step=3
+        )
+        
         _update_current_run_stage("execute")
-        result = executor.execute(script, test_case_id=test_case.id, headed=headed)
-        logger.info("Execution complete - Status: %s", result.get("status"))
-        append_agent_message(db, chat_id, f"UI: initial execution finished with status '{result.get('status')}'.", {"stage": "execute_done", "status": result.get("status"), "error": result.get("error")})
+        
+        # Execute returns ExecutionResult object
+        exec_result = await executor.execute(enhanced_script)
+        
+        # Convert ExecutionResult to old format for compatibility
+        result = {
+            "status": "passed" if exec_result.success else "failed",
+            "error": exec_result.error,
+            "screenshot_path": exec_result.screenshots[0] if exec_result.screenshots else None,
+            "step_screenshots": exec_result.screenshots,
+            "logs_path": f"logs/run_{test_case.id}.log",
+            "healed": exec_result.steps_healed > 0,
+            "steps_executed": exec_result.steps_executed,
+            "steps_healed": exec_result.steps_healed,
+            "duration_ms": exec_result.duration_ms
+        }
+        
+        logger.info("Execution complete - Status: %s (Steps: %d/%d, Healed: %d)", 
+                   result.get("status"), exec_result.steps_executed, 
+                   len(enhanced_script["steps"]), exec_result.steps_healed)
+        append_agent_message(db, chat_id, f"UI: execution finished with status '{result.get('status')}'.", {"stage": "execute_done", "status": result.get("status"), "error": result.get("error"), "healed": result.get("healed", False), "steps_healed": result.get("steps_healed", 0)})
 
-        # Step 6: Heal if failed (up to 2 attempts with full context for healer)
-        healer = HealerAgent()
-        max_heal_attempts = 2
-        current_script = script
-        steps_list = structured_plan.get("steps") or []
-
-        for attempt in range(max_heal_attempts):
-            if result.get("status") != "failed":
-                break
-            logger.info("STEP 6: Self-healing (attempt %s/%s) - Test failed, attempting auto-heal...", attempt + 1, max_heal_attempts)
-            _update_current_run_stage("heal")
-            append_agent_message(db, chat_id, f"UI: healing attempt {attempt + 1}/{max_heal_attempts} for failing step.", {"stage": "heal_attempt", "attempt": attempt + 1, "status": result.get("status"), "error": result.get("error")})
-            failed_idx = result.get("failed_step_index")
-            # failed_step_index from executor is 1-based; steps before failure = indices 0..failed_idx-2
-            steps_before = steps_list[: (failed_idx - 1)] if failed_idx is not None and isinstance(failed_idx, int) and failed_idx >= 1 else None
-            healed = healer.heal(
-                current_script,
-                result.get("error") or "",
-                db,
-                failed_locator=result.get("failed_selector"),
-                test_case_context={"raw_input": request.raw_input, "steps": steps_list},
-                plan=structured_plan,
-                failed_step_index=failed_idx,
-                steps_before_failure=steps_before,
-                failure_url=result.get("failure_url"),
-                failure_page_elements=result.get("failure_page_elements"),
-            )
-            if healed.get("healed"):
-                logger.info("Healing successful - Re-executing...")
-                current_script = healed.get("script") or current_script
-                result = executor.execute(current_script, test_case_id=test_case.id, headed=headed)
-                result["healed"] = True
-                logger.info("Re-execution complete - Status: %s", result.get("status"))
-                append_agent_message(db, chat_id, f"UI: re-execution after healing finished with status '{result.get('status')}'.", {"stage": "heal_execute_done", "status": result.get("status"), "error": result.get("error")})
-            else:
-                logger.warning("Healing failed (no replacement selector found)")
-                break
-
+        # Step 6: EnhancedExecutor already did intelligent retry + healing
+        # No need for additional healing loop - it's built into the executor now
+        
         if result.get("status") == "passed":
-            logger.info("STEP 6: Test passed (with or without healing)")
+            logger.info("STEP 6: Test passed! (Healed steps: %d)", result.get("steps_healed", 0))
             append_agent_message(db, chat_id, "UI: test passed (with or without healing).", {"stage": "complete", "status": result.get("status"), "healed": result.get("healed", False)})
         elif result.get("status") == "failed":
             logger.info("STEP 6: Test still failed after healing attempts")
@@ -550,17 +607,26 @@ async def get_current_run_status():
 @router.get("/current-run/live-screenshot")
 async def get_current_run_live_screenshot():
     """Return latest live or step screenshot for the current UI run (Cursor-style in-app browser view)."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     current = _get_current_run()
     if not current:
+        logger.warning("No UI run in progress")
         raise HTTPException(status_code=404, detail="No UI run in progress")
 
     test_case_id = current.get("test_case_id")
     if not isinstance(test_case_id, int):
+        logger.warning("No valid test_case_id")
         raise HTTPException(status_code=404, detail="No UI run in progress")
 
     backend_root = Path(__file__).resolve().parent.parent
     screenshot_dir = backend_root / "test_outputs" / f"run_{test_case_id}" / "step_screenshots"
+    
+    logger.info(f"Looking for screenshots in: {screenshot_dir}")
+    
     if not screenshot_dir.exists():
+        logger.warning(f"Screenshot directory does not exist: {screenshot_dir}")
         raise HTTPException(status_code=404, detail="No screenshots yet")
 
     # Prefer live.png (updated every 2s during execution) for real-time browser view; fall back to latest step_*.png
@@ -570,6 +636,7 @@ async def get_current_run_live_screenshot():
         try:
             mtime = live_path.stat().st_mtime
             if (time.time() - mtime) < 15:  # consider live if updated in last 15s
+                logger.info(f"Serving live.png (age: {time.time() - mtime:.1f}s)")
                 return FileResponse(
                     live_path,
                     media_type="image/png",
@@ -579,14 +646,17 @@ async def get_current_run_live_screenshot():
                         "Expires": "0",
                     },
                 )
-        except OSError:
+        except OSError as e:
+            logger.warning(f"Error accessing live.png: {e}")
             pass
 
     png_files = sorted(screenshot_dir.glob("step_*.png"))
     if not png_files:
+        logger.warning("No step screenshots found")
         raise HTTPException(status_code=404, detail="No screenshots yet")
 
     latest = png_files[-1]
+    logger.info(f"Serving latest step screenshot: {latest.name}")
     return FileResponse(
         latest,
         media_type="image/png",

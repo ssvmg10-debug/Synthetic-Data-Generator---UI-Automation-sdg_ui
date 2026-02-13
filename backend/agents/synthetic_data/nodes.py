@@ -128,13 +128,23 @@ def crawl_pages_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:
                 num_fields = 0
             logger.info("✅ Extracted schema with %s fields (saved to %s)", num_fields, output_dir or "temp_crawl")
             
-            cache = CrawlCache(
-                url=url,
-                schema_json=schema,
-                html_snapshot=html[:500000] if html else None,
-                expires_at=datetime.utcnow() + timedelta(hours=24)
-            )
-            db.add(cache)
+            # Check if cache already exists and update it, or create new
+            existing_cache = db.query(CrawlCache).filter(CrawlCache.url == url).first()
+            if existing_cache:
+                existing_cache.schema_json = schema
+                existing_cache.html_snapshot = html[:500000] if html else None
+                existing_cache.crawled_at = datetime.utcnow()
+                existing_cache.expires_at = datetime.utcnow() + timedelta(hours=24)
+                logger.info("♻️ Updated existing cache entry for %s", url)
+            else:
+                cache = CrawlCache(
+                    url=url,
+                    schema_json=schema,
+                    html_snapshot=html[:500000] if html else None,
+                    expires_at=datetime.utcnow() + timedelta(hours=24)
+                )
+                db.add(cache)
+                logger.info("💾 Created new cache entry for %s", url)
             db.commit()
             
             schema_row = Schema(source="ui_crawl", schema_json=schema)
