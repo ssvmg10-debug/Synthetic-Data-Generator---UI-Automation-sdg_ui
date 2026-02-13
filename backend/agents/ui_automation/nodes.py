@@ -61,6 +61,13 @@ def generate_script_node(state: UIAutomationState, db: Session) -> Dict[str, Any
     structured_plan = state['structured_plan']
     
     try:
+        app_config = None
+        try:
+            from config.app_config import get_app_config_for_url
+            plan_url = (structured_plan or {}).get("url") or ""
+            app_config = get_app_config_for_url(plan_url)
+        except Exception:
+            pass
         generator = GeneratorAgent()
         ake_script = None
         try:
@@ -68,7 +75,7 @@ def generate_script_node(state: UIAutomationState, db: Session) -> Dict[str, Any
             ake_script = get_ake_script()
         except Exception:
             pass
-        playwright_script = generator.generate(structured_plan, ake_script=ake_script, db=db)
+        playwright_script = generator.generate(structured_plan, ake_script=ake_script, db=db, app_config=app_config)
         
         logger.info("✅ Playwright script generated")
         logger.info(f"📄 Script length: {len(playwright_script)} chars")

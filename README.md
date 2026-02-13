@@ -119,6 +119,25 @@ Opens backend (port 8000) and React UI (port 5173). Open **http://localhost:5173
 
 See **[RUN.md](RUN.md)** for full run options and manual commands.
 
+### 4. UI Automation: Playwright & in-app live view
+
+For UI automation, install Playwright and browsers from the **backend** directory:
+
+```powershell
+cd backend
+npm install @playwright/test
+npx playwright install
+```
+
+Then run LG India test cases (25 end-to-end flows) from the project root:
+
+```powershell
+python run_lg_test_cases.py --list
+python run_lg_test_cases.py --id lg_01_buy_tv_under_30k
+```
+
+The **in-app live view** (screenshots during a run) works when backend and frontend are running and the Vite proxy targets the backend. No CDP is required. See **[docs/LG_UI_AUTOMATION_AND_LIVE_VIEW.md](docs/LG_UI_AUTOMATION_AND_LIVE_VIEW.md)** for details and for stopping long-running UI/crawler processes (`scripts/stop_long_running_ui_processes.ps1`).
+
 ## 📚 Features
 
 ### 🧬 Synthetic Data Generator

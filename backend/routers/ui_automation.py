@@ -361,13 +361,21 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             append_agent_message(db, chat_id, "UI: proceeding without external synthetic data.", {"stage": "load_synthetic", "rows": 0})
         _update_current_run_stage("generate")
 
-        # Step 3: Generate script
+        # Step 3: Generate script (with app-specific config for LG India, etc.)
         logger.info("STEP 3: Generating Playwright script...")
+        try:
+            from config.app_config import get_app_config_for_url
+            plan_url = structured_plan.get("url") or ""
+            app_config = get_app_config_for_url(plan_url)
+            if app_config:
+                logger.info("Using app config for: %s", app_config.get("name") or app_config.get("app_key"))
+        except Exception:
+            app_config = None
         generator = GeneratorAgent()
         language = (request.script_language or "javascript").lower()
         if language not in ("javascript", "typescript"):
             language = "javascript"
-        script = generator.generate(structured_plan, synthetic_data=synthetic_data, language=language, db=db)
+        script = generator.generate(structured_plan, synthetic_data=synthetic_data, language=language, db=db, app_config=app_config)
         logger.info("Script generated (%s characters)", len(script))
         append_agent_message(db, chat_id, f"UI: generated Playwright script ({len(script)} characters).", {"stage": "generate_script", "language": language})
 
@@ -541,7 +549,7 @@ async def get_current_run_status():
 
 @router.get("/current-run/live-screenshot")
 async def get_current_run_live_screenshot():
-    """Return latest step screenshot for the current UI run (for in-app live view)."""
+    """Return latest live or step screenshot for the current UI run (Cursor-style in-app browser view)."""
     current = _get_current_run()
     if not current:
         raise HTTPException(status_code=404, detail="No UI run in progress")
@@ -555,12 +563,40 @@ async def get_current_run_live_screenshot():
     if not screenshot_dir.exists():
         raise HTTPException(status_code=404, detail="No screenshots yet")
 
+    # Prefer live.png (updated every 2s during execution) for real-time browser view; fall back to latest step_*.png
+    import time
+    live_path = screenshot_dir / "live.png"
+    if live_path.exists():
+        try:
+            mtime = live_path.stat().st_mtime
+            if (time.time() - mtime) < 15:  # consider live if updated in last 15s
+                return FileResponse(
+                    live_path,
+                    media_type="image/png",
+                    headers={
+                        "Cache-Control": "no-store, no-cache, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0",
+                    },
+                )
+        except OSError:
+            pass
+
     png_files = sorted(screenshot_dir.glob("step_*.png"))
     if not png_files:
         raise HTTPException(status_code=404, detail="No screenshots yet")
 
     latest = png_files[-1]
-    return FileResponse(latest, media_type="image/png")
+    return FileResponse(
+        latest,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
 
 @router.get("/locators")
 async def get_locator_registry(db: Session = Depends(get_db)):

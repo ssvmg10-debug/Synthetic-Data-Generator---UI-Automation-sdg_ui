@@ -101,6 +101,7 @@ class GeneratorAgent:
         ake_map: Optional[Dict[str, Any]] = None,
         ake_script: Optional[str] = None,
         db: Optional[Any] = None,
+        app_config: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate Playwright test script from structured plan with layered selectors.
         When db is provided, semantic registry (UIElement) selectors are tried first (Katalon-style).
@@ -126,6 +127,7 @@ class GeneratorAgent:
         if capture_screenshots:
             script += self._screenshot_line(step_index)
             step_index += 1
+            script += self._live_view_interval_start()
         script += "\n"
         
         data_index = 0
@@ -142,6 +144,16 @@ class GeneratorAgent:
                     except Exception:
                         pass
                     registry_list = []
+            # App-specific selectors (e.g. LG India cookie banner) take precedence for matching intents
+            if app_config and step.get("intent") == "cookie_accept":
+                cookie_sel = app_config.get("cookie_accept_selectors") or []
+                registry_list = list(cookie_sel) + (registry_list or [])
+            elif app_config and step.get("intent") == "search_box":
+                search_sel = app_config.get("search_box_selectors") or []
+                registry_list = list(search_sel) + (registry_list or [])
+            elif app_config and step.get("intent") == "search_submit":
+                submit_sel = app_config.get("search_submit_selectors") or []
+                registry_list = list(submit_sel) + (registry_list or [])
 
             if action == 'comment':
                 script += f"    // {step.get('description')}\n"
@@ -305,8 +317,8 @@ class GeneratorAgent:
                     script += self._screenshot_line(step_index)
                     step_index += 1
         
-        # Add footer
-        script += self._generate_footer()
+        # Add footer (close try/finally and clear live interval when capture_screenshots)
+        script += self._generate_footer(capture_screenshots=capture_screenshots)
         
         return script
     
@@ -332,26 +344,45 @@ class GeneratorAgent:
 """
 
     def _generate_header(self, test_name: str, language: str = "javascript", capture_screenshots: bool = True) -> str:
-        """Generate script header (JS or TS). Optionally ensure SCREENSHOT_DIR is used."""
+        """Generate script header (JS or TS). Wraps body in try/finally for live-view interval cleanup."""
+        try_finally = "    let __liveInterval;\n    try {\n" if capture_screenshots else ""
         if language == "typescript":
             return f"""import {{ test, expect }} from '@playwright/test';
 
 test('{test_name}', async ({{ page }}) => {{
     test.setTimeout(240000);
-    
+{try_finally}
 """
 
         return f"""const {{ test, expect }} = require('@playwright/test');
 
 test('{test_name}', async ({{ page }}) => {{
     test.setTimeout(240000);
-    
+{try_finally}
 """
-    
-    def _generate_footer(self) -> str:
-        """Generate script footer"""
+
+    def _live_view_interval_start(self) -> str:
+        """Emit JS to start periodic live screenshot (every 2s) for in-app browser view (Cursor-style)."""
+        return """    // Live browser view: stream screenshot every 2s for in-app display
+    const __path = require('path');
+    const __sdir = process.env.SCREENSHOT_DIR;
+    if (__sdir) {
+        __liveInterval = setInterval(async () => {
+            try { await page.screenshot({ path: __path.join(__sdir, 'live.png') }); } catch (_) {}
+        }, 2000);
+    }
+"""
+
+    def _generate_footer(self, capture_screenshots: bool = True) -> str:
+        """Generate script footer. If capture_screenshots, close try/finally and clear live interval."""
+        if capture_screenshots:
+            return """
+    } finally {
+        if (typeof __liveInterval !== 'undefined' && __liveInterval) clearInterval(__liveInterval);
+    }
+});
+"""
         return """
-    // Test completed
 });
 """
     

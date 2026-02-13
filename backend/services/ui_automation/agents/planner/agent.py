@@ -12,6 +12,46 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _inject_app_specific_steps(plan: Dict[str, Any]) -> None:
+    """When app config says so (e.g. LG India), inject cookie_accept step after first navigate."""
+    try:
+        from config.app_config import get_app_config_for_url, should_inject_cookie_step
+    except ImportError:
+        return
+    url = plan.get("url") or ""
+    if not url or not should_inject_cookie_step(url):
+        return
+    steps = plan.get("steps") or []
+    insert_at = None
+    for i, s in enumerate(steps):
+        if s.get("action") == "navigate":
+            insert_at = i + 1
+            break
+    if insert_at is None:
+        return
+    cfg = get_app_config_for_url(url)
+    hints = (cfg or {}).get("cookie_accept_selectors") or [
+        "button:has-text('Accept all')",
+        "button:has-text('Accept')",
+        "a:has-text('Accept all')",
+    ]
+    cookie_step = {
+        "action": "click",
+        "element": "Accept all / cookie consent",
+        "description": "Accept cookie consent banner (injected for this application)",
+        "intent": "cookie_accept",
+        "semantic_target": "button",
+        "selector_hints": hints,
+        "selectors": hints[:6],
+        "selector": hints[0] if hints else "button:has-text('Accept all')",
+    }
+    steps.insert(insert_at, cookie_step)
+    for j, s in enumerate(steps):
+        s["step"] = j + 1
+    plan["total_steps"] = len(steps)
+    logger.info("Injected cookie_accept step after navigate for %s (%s steps)", url[:50], len(steps))
+
+
 def _add_intents_to_steps(plan: Dict[str, Any]) -> None:
     """Add intent, semantic_target, fallback_semantics and selector_hints to each step (enterprise-grade)."""
     try:
@@ -139,6 +179,7 @@ class PlannerAgent:
             plan = _enrich_plan_with_llm(plan)
         else:
             _add_intents_to_steps(plan)
+        _inject_app_specific_steps(plan)
         return plan
     
     def _parse_step(self, line: str, step_number: int) -> Dict[str, Any]:

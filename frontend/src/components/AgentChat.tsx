@@ -153,7 +153,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
     [apiBase, chatId, fetchChats]
   );
 
-  // Poll current run status and live screenshot tick while a UI run is in progress
+  // Poll current run status and live screenshot tick while a UI run is in progress (1s for smooth Cursor-style browser view)
   useEffect(() => {
     if (agentType !== "ui-automation" || !isSending) {
       setRunStage(null);
@@ -174,8 +174,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
       }
     };
     pollStatus();
-    const statusInterval = window.setInterval(pollStatus, 2000);
-    const tickInterval = window.setInterval(() => setLiveTick(prev => prev + 1), 2000);
+    const statusInterval = window.setInterval(pollStatus, 1000);
+    const tickInterval = window.setInterval(() => setLiveTick(prev => prev + 1), 1000);
     return () => {
       window.clearInterval(statusInterval);
       window.clearInterval(tickInterval);
@@ -394,7 +394,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
           {agentType === "ui-automation" && (
             <div className="live-view-container">
               <div className="live-view-header">
-                <span>Live browser view</span>
+                <span>Live browser (updates every ~2s during run)</span>
                 <span className="live-view-status">
                   {isSending
                     ? runStage
@@ -423,13 +423,13 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
                 ) : (
                   <div className="live-view-placeholder">
                     {runStage
-                      ? "Screenshots will appear when the browser starts. Run can take 3–8 minutes."
+                      ? "Browser view will appear when execution starts. Run can take 3–8 minutes."
                       : "Starting run…"}
                   </div>
                 )
               ) : (
                 <div className="live-view-placeholder">
-                  Start a UI automation run to see the live browser view.
+                  Start a UI automation run to see the browser inside the app (Cursor-style).
                 </div>
               )}
             </div>
