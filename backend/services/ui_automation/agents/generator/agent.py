@@ -144,16 +144,14 @@ class GeneratorAgent:
                     except Exception:
                         pass
                     registry_list = []
-            # App-specific selectors (e.g. LG India cookie banner) take precedence for matching intents
-            if app_config and step.get("intent") == "cookie_accept":
-                cookie_sel = app_config.get("cookie_accept_selectors") or []
-                registry_list = list(cookie_sel) + (registry_list or [])
-            elif app_config and step.get("intent") == "search_box":
-                search_sel = app_config.get("search_box_selectors") or []
-                registry_list = list(search_sel) + (registry_list or [])
-            elif app_config and step.get("intent") == "search_submit":
-                submit_sel = app_config.get("search_submit_selectors") or []
-                registry_list = list(submit_sel) + (registry_list or [])
+            # App-specific selectors (e.g. LG India) for any intent from app_config
+            try:
+                from config.app_config import get_selectors_for_intent
+                app_sel = get_selectors_for_intent(app_config, step.get("intent")) if app_config else []
+                if app_sel:
+                    registry_list = list(app_sel) + (registry_list or [])
+            except ImportError:
+                pass
 
             if action == 'comment':
                 script += f"    // {step.get('description')}\n"

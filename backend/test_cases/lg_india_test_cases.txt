@@ -1,0 +1,182 @@
+# LG India – 20 test cases (all combinations, every functionality)
+# Each scenario tests different flows and features. Use each block as raw_input with POST /ui/run
+
+---
+1. Full flow – TV under 30k, single product, guest checkout
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg 108cm tv and then click on buynow for any product under 30000
+then fill the pincode as 500032, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+2. Search only – no purchase (tests search and results)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg washing machine 7kg and view the search results
+
+---
+3. Know More then Buy – product detail page path
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg double door refrigerator
+then click on Know More on any product to open product page, then on that page click on buynow for a product under 35000
+then fill the pincode as 400001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+4. Full flow – refrigerator under 25k, Mumbai pincode
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg double door refrigerator and then click on buynow for any product under 25000
+then fill the pincode as 400001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+5. Full flow – AC under 40k, Bangalore
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg 1.5 ton ac and then click on buynow for any product under 40000
+then fill the pincode as 560001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+6. Two searches then buy – change mind (tests search twice)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg microwave oven and view results
+then click on search again and search for lg 108cm tv and then click on buynow for any product under 32000
+then fill the pincode as 411001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+7. Full flow – premium TV under 1 lakh, Chennai
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg oled tv 139cm and then click on buynow for any product under 100000
+then fill the pincode as 600001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+8. Pincode change – check delivery for two pincodes (tests pincode re-entry)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg water purifier and then click on buynow for any product under 20000
+then fill the pincode as 400001, then click on check
+then change pincode to 500032 and click on check again, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+9. Full flow – microwave under 15k, Pune
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg microwave oven and then click on buynow for any product under 15000
+then fill the pincode as 411001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+10. Full flow – water purifier under 20k, Kolkata
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg ro water purifier and then click on buynow for any product under 20000
+then fill the pincode as 700001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+11. Buy without price filter – first product (tests buy now without condition)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg smart tv and then click on buynow on the first product
+then fill the pincode as 302001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+12. Full flow – dryer under 60k, Ahmedabad
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg dryer 9kg and then click on buynow for any product under 60000
+then fill the pincode as 380001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+13. Full flow – smart TV under 45k, Jaipur
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg smart tv 125cm and then click on buynow for any product under 45000
+then fill the pincode as 302001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+14. Full flow – bottom freezer refrigerator under 35k, Lucknow
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg bottom freezer refrigerator and then click on buynow for any product under 35000
+then fill the pincode as 226001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+15. Full flow – inverter AC under 35k, Coimbatore
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg inverter ac 1 ton and then click on buynow for any product under 35000
+then fill the pincode as 641001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+16. Full flow – front load washing machine under 55k, Chandigarh
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg front load washing machine 8kg and then click on buynow for any product under 55000
+then fill the pincode as 160001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+17. Full flow – mini fridge under 18k, Kochi (budget)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg single door refrigerator and then click on buynow for any product under 18000
+then fill the pincode as 682001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+18. Full flow – 80cm TV under 20k, Nagpur (budget TV)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg 80cm tv and then click on buynow for any product under 20000
+then fill the pincode as 440001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+19. Full flow – french door refrigerator under 80k, Surat (premium)
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg french door refrigerator and then click on buynow for any product under 80000
+then fill the pincode as 395001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details
+
+---
+20. Full flow – split AC under 30k, Thiruvananthapuram
+
+navigate to this application https://www.lg.com/in
+click on search option and search for lg split ac 1 ton and then click on buynow for any product under 30000
+then fill the pincode as 695001, then click on check, and click on free delivery, then click on checkout
+then click on continue with this condition (complete purchase as guest)
+then fill billing/shipping details

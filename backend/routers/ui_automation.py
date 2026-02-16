@@ -22,11 +22,15 @@ from services.ui_automation.utils.selector_validator import SelectorValidator
 from services.ui_automation.utils.fuzzy_matcher import FuzzyMatcher
 from services.ui_automation.run_status import get_or_create_tracker, ExecutionPhase
 from services.ui_automation.engine.enhanced_executor import EnhancedExecutor, ExecutionResult
+from services.ui_automation.flow_engine import FlowEngine, FlowResult
+from services.ui_automation.selector_registry import SelectorRegistryService
+from services.ui_automation.metrics import record_run, get_kpis
 
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
 import logging
+import os
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -81,6 +85,7 @@ class UITestRequest(BaseModel):
     script_language: Optional[str] = "javascript"
     chat_id: Optional[int] = None  # If set, append to this chat; response includes chat_id
     visible_browser: Optional[bool] = True  # If false, run Playwright in headless mode
+    use_flow_engine: bool = False  # Use state-machine flow engine (domain-aware) instead of step-based executor
 
 class UIExecuteRequest(BaseModel):
     test_case_id: int
@@ -402,18 +407,33 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         # Step 5: PRE-VALIDATE selectors (NEW Phase 1)
         logger.info("STEP 5a: Pre-validating selectors against actual page...")
         url = structured_plan.get("url") or "https://sauce-demo.myshopify.com/"
-        
-        # Convert script steps to validator format
+        try:
+            from config.app_config import get_app_config_for_url, get_selectors_for_intent as _get_selectors
+            _val_cfg = get_app_config_for_url(url)
+        except Exception:
+            _val_cfg = None
+            def _get_selectors(_c, _i):
+                return []
+        # Convert script steps to validator format (same order as execution; include locator_hint for Playwright fallbacks)
         steps_for_validation = []
         for step in structured_plan.get("steps", []):
-            action = step.get("intent", "")
+            plan_action = step.get("action", "")
+            if plan_action in ("navigate", "goto"):
+                continue
+            intent = step.get("intent", "")
             selector = step.get("selector", "")
-            if selector and action in ["click", "fill", "select"]:
-                steps_for_validation.append({
-                    "action": action,
+            if not selector and intent == "cookie_accept":
+                _sels = _get_selectors(_val_cfg, "cookie_accept")
+                selector = _sels[0] if _sels else "button:has-text('Accept all')"
+            if selector and intent in ["click", "fill", "select", "cookie_accept", "search_icon", "search_submit", "add_to_cart", "checkout", "guest_checkout", "pincode_zip", "pincode_check", "billing_shipping"]:
+                val_step = {
+                    "action": "click" if intent == "cookie_accept" else ("fill" if intent in ("search_box", "email_field", "pincode_zip", "billing_shipping") else "click"),
                     "selector": selector,
                     "value": step.get("value", "")
-                })
+                }
+                if step.get("locator_hint"):
+                    val_step["locator_hint"] = step["locator_hint"]
+                steps_for_validation.append(val_step)
         
         if steps_for_validation:
             try:
@@ -446,38 +466,124 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
             "starting_url": url,
             "steps": []
         }
+        # Prepend explicit goto so we always navigate first (plan may have navigate as generic_type)
+        if url:
+            enhanced_script["steps"].append({
+                "action": "goto",
+                "selector": "",
+                "value": url,
+            })
+        try:
+            from config.app_config import get_app_config_for_url, get_selectors_for_intent
+            from services.ui_automation.intent import get_locator_hint_for_intent
+            app_config = get_app_config_for_url(url)
+        except Exception:
+            app_config = None
+            def get_selectors_for_intent(_c, _i):
+                return []
+            def get_locator_hint_for_intent(_i):
+                return None
+        cfg = app_config or {}
+        fill_intents = {"search_box", "email_field", "pincode_zip", "billing_shipping"}
+
         for step in structured_plan.get("steps", []):
+            plan_action = step.get("action", "")
+            if plan_action in ("navigate", "goto"):
+                continue
             action = step.get("intent", "click")
             selector = step.get("selector", "")
             value = step.get("value", "")
-            
-            if action in ["navigate", "goto"]:
-                enhanced_script["steps"].append({
-                    "action": "goto",
-                    "selector": "",
-                    "value": value or url
-                })
-            elif selector:
-                enhanced_script["steps"].append({
-                    "action": action,
-                    "selector": selector,
-                    "value": value,
-                    "alternatives": []  # Could add alternatives here
-                })
+            app_selectors = get_selectors_for_intent(cfg, action)
+            step_action = "fill" if action in fill_intents else ("click" if action == "cookie_accept" else action)
+            if action == "cookie_accept":
+                step_action = "click"
+            elif action in fill_intents:
+                step_action = "fill"
+            else:
+                step_action = action if action in ("click", "fill", "select", "press", "wait") else "click"
+
+            if selector or app_selectors or action == "cookie_accept":
+                sel = selector or (app_selectors[0] if app_selectors else "")
+                alternatives = [s for s in (app_selectors[1:10] if app_selectors else []) if s != sel]
+                if not alternatives:
+                    step_selectors = step.get("selectors") or []
+                    if isinstance(step_selectors, list):
+                        alternatives = [s.get("selector", s) if isinstance(s, dict) else str(s) for s in step_selectors[:8] if s and (s != sel if isinstance(s, str) else s.get("selector") != sel)]
+                    else:
+                        alternatives = step.get("alternatives") or []
+                if not sel and action == "cookie_accept":
+                    sel = "button:has-text('Accept all')"
+                if not sel and action == "search_box":
+                    sel = "input[type='search']"
+                if not sel and action == "search_submit":
+                    sel = "button[type='submit']"
+                if not sel and app_selectors:
+                    sel = app_selectors[0]
+                if sel:
+                    locator_hint = step.get("locator_hint") or get_locator_hint_for_intent(action)
+                    out_step = {
+                        "action": step_action,
+                        "selector": sel,
+                        "value": value,
+                        "alternatives": alternatives[:8],
+                        "intent": action,
+                    }
+                    if locator_hint:
+                        out_step["locator_hint"] = locator_hint
+                    if step.get("condition"):
+                        out_step["condition"] = step["condition"]
+                    if step.get("semantic_action"):
+                        out_step["semantic_action"] = step["semantic_action"]
+                    enhanced_script["steps"].append(out_step)
         
-        # Use EnhancedExecutor instead of old executor
-        executor = EnhancedExecutor(
-            run_id=run_id,
-            headless=not headed,
-            screenshot_dir=f"screenshots/{test_case.id}",
-            enable_healing=True,
-            max_retries_per_step=3
-        )
-        
+        _backend_root = Path(__file__).resolve().parent.parent
+        _screenshot_dir = str(_backend_root / "test_outputs" / f"run_{test_case.id}" / "step_screenshots")
+        os.makedirs(_screenshot_dir, exist_ok=True)
         _update_current_run_stage("execute")
-        
-        # Execute returns ExecutionResult object
-        exec_result = await executor.execute(enhanced_script)
+
+        # Flow Engine path: state-machine, domain-aware (for LG and similar e-commerce)
+        _flow_cfg = (app_config or {}).get("use_flow_engine", False)
+        use_flow = (request.use_flow_engine or _flow_cfg) and "lg.com" in (url or "").lower()
+        if use_flow:
+            logger.info("STEP 5b: Using Flow Engine (state-machine, domain-aware)...")
+            append_agent_message(db, chat_id, "UI: executing with Flow Engine (state-machine).", {"stage": "execute_flow"})
+            constraints = {}
+            for step in structured_plan.get("steps", []):
+                if step.get("intent") == "search_box" and step.get("value"):
+                    constraints["search_query"] = step.get("value", "")
+                if step.get("intent") == "pincode_zip" and step.get("value"):
+                    constraints["pincode"] = step.get("value", "")
+                if step.get("condition", {}).get("price_max") is not None:
+                    constraints["product_price_max"] = step["condition"]["price_max"]
+            flow = FlowEngine(
+                goal="complete_guest_checkout",
+                constraints=constraints,
+                headless=not headed,
+                run_id=run_id,
+                screenshot_dir=_screenshot_dir,
+            )
+            flow_result = await flow.run(url=url, plan=structured_plan, raw_input=test_case.raw_input)
+            exec_result = type("Result", (), {
+                "success": flow_result.success and flow_result.goal_reached,
+                "steps_executed": flow_result.steps_executed,
+                "steps_healed": 0,
+                "duration_ms": 0,
+                "screenshots": flow_result.screenshots or [],
+                "error": flow_result.error,
+            })()
+        else:
+            # Step-based EnhancedExecutor with Selector Registry (record heals, get primary)
+            selector_registry = SelectorRegistryService(db)
+            executor = EnhancedExecutor(
+                run_id=run_id,
+                headless=not headed,
+                screenshot_dir=_screenshot_dir,
+                enable_healing=True,
+                max_retries_per_step=3,
+                step_timeout_ms=20000,
+                selector_registry=selector_registry,
+            )
+            exec_result = await executor.execute(enhanced_script)
         
         # Convert ExecutionResult to old format for compatibility
         result = {
@@ -517,6 +623,14 @@ async def run_full_ui_test(request: UITestRequest, background_tasks: BackgroundT
         db.add(execution_run)
         db.commit()
         db.refresh(execution_run)
+
+        # POC metrics (no Celery/Grafana – in-memory for dashboard)
+        record_run(
+            success=(result.get("status") == "passed"),
+            steps_executed=result.get("steps_executed", 0),
+            steps_healed=result.get("steps_healed", 0),
+            steps_failed=result.get("steps_failed", 0),
+        )
 
         logger.info("="*80)
         logger.info("SUCCESS: UI Test Complete")
@@ -682,6 +796,131 @@ async def get_locator_registry(db: Session = Depends(get_db)):
             for loc in locators
         ]
     }
+
+
+@router.get("/heals/pending")
+async def get_pending_heals_for_review(db: Session = Depends(get_db)):
+    """
+    Human-in-the-loop: return low-confidence heals for approval before auto-promotion.
+    Selectors with confidence < 0.8 or success_count < 3 are returned for review.
+    """
+    try:
+        from models import UIElement
+        rows = db.query(UIElement).all()
+        pending = []
+        for row in rows:
+            selectors = row.selectors or []
+            if not isinstance(selectors, list):
+                continue
+            for s in selectors:
+                if not isinstance(s, dict):
+                    continue
+                conf = s.get("confidence") or 0
+                success = s.get("success_count") or 0
+                if conf < 0.8 or success < 3:
+                    pending.append({
+                        "app_key": row.app_key,
+                        "intent": row.intent,
+                        "selector": s.get("selector", ""),
+                        "source": s.get("source", ""),
+                        "confidence": conf,
+                        "success_count": success,
+                        "failure_count": s.get("failure_count", 0),
+                    })
+        return {"pending": pending, "count": len(pending)}
+    except Exception as e:
+        logger.debug("Pending heals: %s", e)
+        return {"pending": [], "count": 0}
+
+
+class ApproveHealBody(BaseModel):
+    app_key: str
+    intent: str
+    selector: str
+
+
+@router.post("/heals/approve")
+async def approve_pending_heal(body: ApproveHealBody, db: Session = Depends(get_db)):
+    """
+    Human-in-the-loop: approve a low-confidence heal so it is treated as promoted.
+    Sets confidence=1.0 and success_count=3 for the given selector in UIElement.
+    """
+    try:
+        from models import UIElement
+        row = db.query(UIElement).filter(
+            UIElement.app_key == body.app_key,
+            UIElement.intent == body.intent,
+        ).first()
+        if not row or not row.selectors:
+            raise HTTPException(status_code=404, detail="Intent not found")
+        selectors = list(row.selectors) if isinstance(row.selectors, list) else []
+        for s in selectors:
+            if not isinstance(s, dict):
+                continue
+            if (s.get("selector") or "").strip() == body.selector.strip():
+                s["confidence"] = 1.0
+                s["success_count"] = max(s.get("success_count") or 0, 3)
+                row.selectors = selectors
+                db.commit()
+                return {"approved": True, "app_key": body.app_key, "intent": body.intent}
+        raise HTTPException(status_code=404, detail="Selector not found in registry")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.debug("Approve heal: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics")
+async def get_ui_metrics():
+    """
+    POC observability: in-memory KPIs for dashboard (no Grafana).
+    Returns runs_total, runs_passed, pass_rate_pct, steps_healed, steps_failed.
+    """
+    return get_kpis()
+
+
+class SmokeCheckBody(BaseModel):
+    url: Optional[str] = None
+    test_case_id: Optional[int] = None
+
+
+@router.post("/smoke-check")
+async def ui_smoke_check(body: Optional[SmokeCheckBody] = None, db: Session = Depends(get_db)):
+    """
+    CI-style smoke check without Celery: run selector validation on one URL or test case.
+    Returns pass/fail for POC demos and simple CI (e.g. script that curls POST /smoke-check).
+    """
+    try:
+        from services.ui_automation.utils.selector_validator import SelectorValidator
+        url = "https://example.com"
+        steps = [{"action": "goto", "value": url, "description": "Open example"}]
+        if body and body.test_case_id:
+            tc = db.query(UITestCase).filter(UITestCase.id == body.test_case_id).first()
+            if tc and tc.structured_json:
+                plan = tc.structured_json
+                url = plan.get("url") or plan.get("starting_url") or url
+                steps = plan.get("steps") or steps
+        if body and body.url:
+            url = body.url
+            steps = [{"action": "goto", "value": url, "description": "Open URL"}] + [
+                s for s in steps if s.get("action") != "goto"
+            ][:5]
+        validator = SelectorValidator(headless=True)
+        result = await validator.validate_script(url, steps[:10], wait_for_load=True)
+        passed = result.get("validation_passed", False)
+        return {
+            "passed": passed,
+            "detail": {
+                "valid_count": result.get("valid_count", 0),
+                "invalid_count": result.get("invalid_count", 0),
+                "fixed_count": result.get("fixed_count", 0),
+                "url": url,
+            },
+        }
+    except Exception as e:
+        logger.exception("Smoke check failed")
+        return {"passed": False, "detail": {"error": str(e)}}
 
 
 # ========== PLAYWRIGHT TEST AGENTS ENDPOINTS ==========

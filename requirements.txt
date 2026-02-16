@@ -1,3 +1,6 @@
+# On Windows without Visual C++ Build Tools: use Python 3.12 (e.g. py -3.12 -m venv .venv).
+# Python 3.13+ has no pre-built wheels for numpy/pandas and will try to build from source.
+#
 # FastAPI Backend Dependencies
 fastapi==0.109.0
 uvicorn[standard]==0.27.0

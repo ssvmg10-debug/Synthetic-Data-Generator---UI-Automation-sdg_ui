@@ -8,10 +8,25 @@ import re
 import logging
 import asyncio
 import sys
+import time
 
 from services.ui_automation.utils.fuzzy_matcher import FuzzyMatcher
 
 logger = logging.getLogger(__name__)
+
+
+def _should_use_sync_playwright() -> bool:
+    """Use sync Playwright in a thread when on Windows without ProactorEventLoop (avoids subprocess NotImplementedError)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        loop = asyncio.get_running_loop()
+        if isinstance(loop, asyncio.ProactorEventLoop):
+            return False
+        logger.info("Using sync Playwright fallback (Windows non-ProactorEventLoop)")
+        return True
+    except RuntimeError:
+        return False
 
 
 def ensure_windows_event_loop():
@@ -98,14 +113,17 @@ class SelectorValidator:
         Raises:
             Exception: If page fails to load or browser errors occur
         """
-        import time
         start_time = time.time()
-        
         logger.info(f"Starting selector validation for {len(steps)} steps on {url}")
-        
-        # Ensure Windows event loop supports subprocesses
-        ensure_windows_event_loop()
-        
+
+        # On Windows with non-ProactorEventLoop, run sync Playwright in a thread to avoid NotImplementedError
+        if _should_use_sync_playwright():
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None,
+                lambda: self._validate_script_sync(url, steps, wait_for_load),
+            )
+
         validated_steps = []
         invalid_selectors = []
         auto_fixed = []
@@ -113,71 +131,82 @@ class SelectorValidator:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             page = await browser.new_page()
-            
+            # Use domcontentloaded for faster validation; networkidle can add 5–30s on heavy sites
+            wait_until = "domcontentloaded"
+
             try:
-                # Navigate to page
-                await page.goto(url, wait_until="networkidle" if wait_for_load else "domcontentloaded", timeout=30000)
-                logger.info(f"Page loaded: {url}")
-                
-                # Validate each step
+                # Step-through validation: run steps in order so each selector is checked on the page it applies to
+                initial_url = url
+                if steps and steps[0].get("action") == "goto" and steps[0].get("value"):
+                    initial_url = steps[0].get("value", url)
+                await page.goto(initial_url, wait_until=wait_until, timeout=25000)
+                logger.info(f"Step-through validation: loaded {initial_url}")
+
                 for i, step in enumerate(steps):
-                    selector = step.get('selector')
-                    action = step.get('action', 'unknown')
-                    description = step.get('description', f'Step {i+1}')
-                    
-                    # Skip steps without selectors (e.g., navigation, wait steps)
-                    if not selector or action in ['goto', 'wait', 'waitForSelector']:
+                    selector = step.get("selector")
+                    action = step.get("action", "unknown")
+                    description = step.get("description", f"Step {i+1}")
+
+                    if action == "goto":
                         validated_steps.append(step)
+                        nav_url = step.get("value") or url
+                        try:
+                            await page.goto(nav_url, wait_until=wait_until, timeout=25000)
+                            await page.wait_for_timeout(1500)
+                        except Exception as e:
+                            logger.debug("Validation goto failed: %s", e)
                         continue
-                    
-                    # Check if selector is valid
+
+                    if action in ("wait", "waitForSelector") or not selector:
+                        validated_steps.append(step)
+                        if action == "wait" and step.get("value"):
+                            try:
+                                await page.wait_for_timeout(min(int(step.get("value", 1000)), 5000))
+                            except Exception:
+                                pass
+                        continue
+
                     try:
                         count = await page.locator(selector).count()
-                        
+                        if count == 0 and step.get("locator_hint"):
+                            # Prefer Playwright locator_hint (get_by_role etc.) when CSS has 0 matches
+                            hint_count = await self._locator_hint_count_async(page, step)
+                            if hint_count == 1:
+                                count = 1
+                                logger.debug(f"✓ Step {i+1} valid via locator_hint")
                         if count == 0:
-                            # Selector is invalid - try to fix
-                            logger.warning(f"Invalid selector at step {i+1}: '{selector}' (0 matches)")
-                            
-                            fixed_selector = await self._fuzzy_fix_selector(page, step, selector)
-                            
+                            fixed_selector = await self._try_playwright_locators_async(page, step, selector)
+                            if not fixed_selector:
+                                fixed_selector = await self._fuzzy_fix_selector(page, step, selector)
                             if fixed_selector:
-                                # Auto-fixed successfully
-                                step['selector'] = fixed_selector
-                                step['original_selector'] = selector
-                                step['auto_fixed'] = True
-                                
+                                step["selector"] = fixed_selector
+                                step["original_selector"] = selector
+                                step["auto_fixed"] = True
                                 auto_fixed.append({
                                     "step_index": i + 1,
                                     "description": description,
                                     "original": selector,
                                     "fixed": fixed_selector,
-                                    "action": action
+                                    "action": action,
                                 })
-                                
                                 logger.info(f"✅ Auto-fixed step {i+1}: '{selector}' → '{fixed_selector}'")
                             else:
-                                # Could not fix
                                 invalid_selectors.append({
                                     "step_index": i + 1,
                                     "description": description,
                                     "selector": selector,
                                     "action": action,
-                                    "reason": "No matching element found and fuzzy match failed"
+                                    "reason": "No matching element and fix failed",
                                 })
-                                
                                 logger.error(f"❌ Could not fix step {i+1}: '{selector}'")
-                        
                         elif count > 1:
-                            # Multiple matches - warn but allow (first match will be used)
-                            logger.warning(f"Selector at step {i+1} matches {count} elements: '{selector}' (will use first)")
-                            step['multiple_matches'] = count
-                        
+                            step["multiple_matches"] = count
                         else:
-                            # Exactly 1 match - perfect
                             logger.debug(f"✓ Valid selector at step {i+1}: '{selector}'")
-                        
+
                         validated_steps.append(step)
-                    
+                        if count > 0 or step.get("auto_fixed"):
+                            await self._execute_step_for_validation_async(page, step)
                     except Exception as e:
                         logger.error(f"Error validating selector at step {i+1}: {e}")
                         invalid_selectors.append({
@@ -185,29 +214,34 @@ class SelectorValidator:
                             "description": description,
                             "selector": selector,
                             "action": action,
-                            "reason": f"Validation error: {str(e)}"
+                            "reason": str(e),
                         })
                         validated_steps.append(step)
-            
+
             finally:
                 await browser.close()
         
         validation_time = time.time() - start_time
         validation_passed = len(invalid_selectors) == 0
         
+        stats = {
+            "total_steps": len(steps),
+            "validated": len(validated_steps),
+            "invalid": len(invalid_selectors),
+            "auto_fixed": len(auto_fixed),
+            "success_rate": (len(steps) - len(invalid_selectors)) / len(steps) if steps else 0
+        }
         result = {
             "validated_steps": validated_steps,
             "invalid_selectors": invalid_selectors,
             "auto_fixed": auto_fixed,
             "validation_passed": validation_passed,
             "validation_time": validation_time,
-            "stats": {
-                "total_steps": len(steps),
-                "validated": len(validated_steps),
-                "invalid": len(invalid_selectors),
-                "auto_fixed": len(auto_fixed),
-                "success_rate": (len(steps) - len(invalid_selectors)) / len(steps) if steps else 0
-            }
+            "stats": stats,
+            "steps": validated_steps,
+            "valid_count": stats["validated"],
+            "invalid_count": stats["invalid"],
+            "fixed_count": stats["auto_fixed"],
         }
         
         logger.info(
@@ -216,6 +250,298 @@ class SelectorValidator:
         )
         
         return result
+
+    async def _locator_hint_count_async(self, page: Page, step: Dict[str, Any]) -> int:
+        """Return number of elements matching step's locator_hint (0 if no hint or error)."""
+        hint = step.get("locator_hint")
+        if not isinstance(hint, dict) or not hint:
+            return 0
+        try:
+            if hint.get("role"):
+                name = hint.get("name")
+                loc = page.get_by_role(hint["role"], name=re.compile(re.escape(name), re.I)) if name else page.get_by_role(hint["role"])
+            elif hint.get("placeholder"):
+                loc = page.get_by_placeholder(hint["placeholder"])
+            elif hint.get("label"):
+                loc = page.get_by_label(hint["label"])
+            else:
+                return 0
+            return await loc.count()
+        except Exception:
+            return 0
+
+    async def _try_playwright_locators_async(
+        self, page: Page, step: Dict[str, Any], failed_selector: str
+    ) -> Optional[str]:
+        """Use Playwright's role/label/placeholder locators when CSS fails (more resilient)."""
+        action = step.get("action", "")
+        try:
+            if action in ("fill", "type"):
+                # Try searchbox role (common for search inputs)
+                if await page.get_by_role("searchbox").count() == 1:
+                    return "input[type='search'], [role='searchbox'], input[placeholder*='Search'], input[placeholder*='search']"
+                # Try placeholder from step value or common names
+                fill_value = (step.get("value") or "").strip() or "search"
+                for placeholder in [fill_value, "Search", "search", "Enter"]:
+                    try:
+                        if await page.get_by_placeholder(placeholder).count() == 1:
+                            return f"input[placeholder*='{placeholder}']"
+                    except Exception:
+                        pass
+            if action == "click":
+                for role in ["button", "link"]:
+                    try:
+                        for name in ["Accept", "Accept all", "OK", "Agree", "Allow"]:
+                            if await page.get_by_role(role, name=re.compile(name, re.I)).count() == 1:
+                                return f"[role='{role}']:has-text('{name}')"
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.debug("Playwright locator fallback failed: %s", e)
+        return None
+
+    async def _execute_step_for_validation_async(self, page: Page, step: Dict[str, Any]) -> None:
+        """Execute one step so the next validation runs on the right page. Tries locator_hint first if present."""
+        action = step.get("action")
+        value = (step.get("value") or "").strip() or "test"
+        hint = step.get("locator_hint")
+        if isinstance(hint, dict) and hint and action in ("click", "fill", "type"):
+            try:
+                loc = None
+                if hint.get("role"):
+                    name = hint.get("name")
+                    loc = page.get_by_role(hint["role"], name=re.compile(re.escape(name), re.I)) if name else page.get_by_role(hint["role"])
+                elif hint.get("placeholder"):
+                    loc = page.get_by_placeholder(hint["placeholder"])
+                elif hint.get("label"):
+                    loc = page.get_by_label(hint["label"])
+                if loc and await loc.count() > 0:
+                    await loc.first.wait_for(state="visible", timeout=8000)
+                    if action == "click":
+                        await loc.first.click(timeout=8000)
+                    elif action in ("fill", "type"):
+                        await loc.first.fill(value, timeout=8000)
+                    await page.wait_for_timeout(1500)
+                    return
+            except Exception as e:
+                logger.debug("Validation step locator_hint (async): %s", e)
+        selector = step.get("selector") or step.get("original_selector")
+        if not selector:
+            return
+        try:
+            if action == "click":
+                await page.click(selector, timeout=8000)
+                await page.wait_for_timeout(1500)
+            elif action in ("fill", "type"):
+                await page.fill(selector, value, timeout=8000)
+                await page.wait_for_timeout(500)
+            elif action == "press":
+                await page.press(selector, step.get("value") or "Enter", timeout=5000)
+                await page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.debug("Validation step execute (advance page): %s", e)
+
+    def _validate_script_sync(
+        self,
+        url: str,
+        steps: List[Dict[str, Any]],
+        wait_for_load: bool = True,
+    ) -> Dict[str, Any]:
+        """Sync Playwright validation with step-through (used on Windows)."""
+        from playwright.sync_api import sync_playwright
+
+        start_time = time.time()
+        validated_steps = []
+        invalid_selectors = []
+        auto_fixed = []
+        wait_until = "domcontentloaded"
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=self.headless)
+            page = browser.new_page()
+            try:
+                initial_url = url
+                if steps and steps[0].get("action") == "goto" and steps[0].get("value"):
+                    initial_url = steps[0].get("value", url)
+                page.goto(initial_url, wait_until=wait_until, timeout=25000)
+                page.wait_for_timeout(1500)
+                logger.info("Step-through validation (sync): loaded %s", initial_url)
+
+                for i, step in enumerate(steps):
+                    selector = step.get("selector")
+                    action = step.get("action", "unknown")
+                    description = step.get("description", f"Step {i+1}")
+
+                    if action == "goto":
+                        validated_steps.append(step)
+                        nav_url = step.get("value") or url
+                        try:
+                            page.goto(nav_url, wait_until=wait_until, timeout=25000)
+                            page.wait_for_timeout(1500)
+                        except Exception as e:
+                            logger.debug("Validation goto failed: %s", e)
+                        continue
+
+                    if action in ("wait", "waitForSelector") or not selector:
+                        validated_steps.append(step)
+                        if action == "wait" and step.get("value"):
+                            try:
+                                page.wait_for_timeout(min(int(step.get("value", 1000)), 5000))
+                            except Exception:
+                                pass
+                        continue
+
+                    try:
+                        count = page.locator(selector).count()
+                        if count == 0 and step.get("locator_hint"):
+                            hint_count = self._locator_hint_count_sync(page, step)
+                            if hint_count == 1:
+                                count = 1
+                        if count == 0:
+                            fixed_selector = self._try_playwright_locators_sync(page, step, selector)
+                            if not fixed_selector:
+                                invalid_selectors.append({
+                                    "step_index": i + 1,
+                                    "description": description,
+                                    "selector": selector,
+                                    "action": action,
+                                    "reason": "No matching element (sync path)",
+                                })
+                            else:
+                                step["selector"] = fixed_selector
+                                step["original_selector"] = selector
+                                step["auto_fixed"] = True
+                                auto_fixed.append({
+                                    "step_index": i + 1,
+                                    "description": description,
+                                    "original": selector,
+                                    "fixed": fixed_selector,
+                                    "action": action,
+                                })
+                        elif count > 1:
+                            step["multiple_matches"] = count
+                        validated_steps.append(step)
+                        if count > 0 or step.get("auto_fixed"):
+                            self._execute_step_for_validation_sync(page, step)
+                    except Exception as e:
+                        invalid_selectors.append({
+                            "step_index": i + 1,
+                            "description": description,
+                            "selector": selector,
+                            "action": action,
+                            "reason": str(e),
+                        })
+                        validated_steps.append(step)
+            finally:
+                browser.close()
+
+    def _locator_hint_count_sync(self, page: Any, step: Dict[str, Any]) -> int:
+        """Return number of elements matching step's locator_hint (0 if no hint or error)."""
+        hint = step.get("locator_hint")
+        if not isinstance(hint, dict) or not hint:
+            return 0
+        try:
+            if hint.get("role"):
+                name = hint.get("name")
+                loc = page.get_by_role(hint["role"], name=re.compile(re.escape(name), re.I)) if name else page.get_by_role(hint["role"])
+            elif hint.get("placeholder"):
+                loc = page.get_by_placeholder(hint["placeholder"])
+            elif hint.get("label"):
+                loc = page.get_by_label(hint["label"])
+            else:
+                return 0
+            return loc.count()
+        except Exception:
+            return 0
+
+    def _try_playwright_locators_sync(
+        self, page: Any, step: Dict[str, Any], failed_selector: str
+    ) -> Optional[str]:
+        """Sync: try Playwright role/placeholder locators when CSS fails."""
+        action = step.get("action", "")
+        try:
+            if action in ("fill", "type"):
+                if page.get_by_role("searchbox").count() == 1:
+                    return "input[type='search'], [role='searchbox'], input[placeholder*='Search']"
+                for placeholder in ["Search", "search", "Enter"]:
+                    try:
+                        if page.get_by_placeholder(placeholder).count() == 1:
+                            return f"input[placeholder*='{placeholder}']"
+                    except Exception:
+                        pass
+            if action == "click":
+                for name in ["Accept", "Accept all", "OK"]:
+                    try:
+                        if page.get_by_role("button", name=re.compile(name, re.I)).count() == 1:
+                            return f"button:has-text('{name}'), [role='button']:has-text('{name}')"
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.debug("Playwright locator fallback (sync) failed: %s", e)
+        return None
+
+    def _execute_step_for_validation_sync(self, page: Any, step: Dict[str, Any]) -> None:
+        """Sync: execute one step to advance page for next validation. Tries locator_hint first if present."""
+        action = step.get("action")
+        value = (step.get("value") or "").strip() or "test"
+        hint = step.get("locator_hint")
+        if isinstance(hint, dict) and hint and action in ("click", "fill", "type"):
+            try:
+                loc = None
+                if hint.get("role"):
+                    name = hint.get("name")
+                    loc = page.get_by_role(hint["role"], name=re.compile(re.escape(name), re.I)) if name else page.get_by_role(hint["role"])
+                elif hint.get("placeholder"):
+                    loc = page.get_by_placeholder(hint["placeholder"])
+                elif hint.get("label"):
+                    loc = page.get_by_label(hint["label"])
+                if loc and loc.count() > 0:
+                    loc.first.wait_for(state="visible", timeout=8000)
+                    if action == "click":
+                        loc.first.click(timeout=8000)
+                    elif action in ("fill", "type"):
+                        loc.first.fill(value, timeout=8000)
+                    page.wait_for_timeout(1500)
+                    return
+            except Exception as e:
+                logger.debug("Validation step locator_hint (sync): %s", e)
+        selector = step.get("selector") or step.get("original_selector")
+        if not selector:
+            return
+        try:
+            if action == "click":
+                page.click(selector, timeout=8000)
+                page.wait_for_timeout(1500)
+            elif action in ("fill", "type"):
+                page.fill(selector, value, timeout=8000)
+                page.wait_for_timeout(500)
+            elif action == "press":
+                page.press(selector, step.get("value") or "Enter", timeout=5000)
+                page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.debug("Validation step execute (sync): %s", e)
+
+        validation_time = time.time() - start_time
+        validation_passed = len(invalid_selectors) == 0
+        stats = {
+            "total_steps": len(steps),
+            "validated": len(validated_steps),
+            "invalid": len(invalid_selectors),
+            "auto_fixed": len(auto_fixed),
+            "success_rate": (len(steps) - len(invalid_selectors)) / len(steps) if steps else 0,
+        }
+        return {
+            "validated_steps": validated_steps,
+            "invalid_selectors": invalid_selectors,
+            "auto_fixed": auto_fixed,
+            "validation_passed": validation_passed,
+            "validation_time": validation_time,
+            "stats": stats,
+            "steps": validated_steps,
+            "valid_count": stats["validated"],
+            "invalid_count": stats["invalid"],
+            "fixed_count": stats["auto_fixed"],
+        }
     
     async def _fuzzy_fix_selector(
         self,
@@ -351,23 +677,19 @@ class SelectorValidator:
     def _generate_selector_for_text(self, text: str, action: str) -> str:
         """
         Generate a Playwright selector for the given text and action.
-        
-        Args:
-            text: Text content to match
-            action: Action type (click, fill, etc.)
-        
-        Returns:
-            Playwright selector string
+        Prefers stable locators: role+text, then semantic tags, then generic.
         """
-        # Escape text for selector
-        escaped_text = text.replace("'", "\\'").replace('"', '\\"')
-        
-        if action in ['fill', 'type']:
-            # For inputs, try getByPlaceholder or getByLabel
-            return f"input:has-text('{escaped_text}'), [placeholder*='{escaped_text}'], input[aria-label*='{escaped_text}']"
-        else:
-            # For clicks, use :has-text() which works for buttons, links, etc.
-            return f":has-text('{escaped_text}')"
+        # Normalize: escape for use inside quoted selector
+        t = (text or "").strip()
+        if not t:
+            return ""
+        escaped = re.sub(r"(['\"\\])", r"\\\1", t)
+
+        if action in ["fill", "type"]:
+            # Inputs: placeholder, aria-label, name
+            return f"input[placeholder*='{escaped}'], input[aria-label*='{escaped}'], input[name*='{escaped}']"
+        # Clicks: prefer button/link with text for stability
+        return f"button:has-text('{escaped}'), a:has-text('{escaped}'), [role='button']:has-text('{escaped}')"
     
     async def _get_clickable_elements(self, page: Page) -> List[Dict[str, Any]]:
         """Extract all clickable elements from page."""

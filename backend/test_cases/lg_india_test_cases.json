@@ -1,0 +1,105 @@
+{
+  "description": "20 LG India test cases in plain English. Use raw_input with POST /ui/run.",
+  "test_cases": [
+    {
+      "id": "LG-01",
+      "name": "TV under 30k, Hyderabad",
+      "raw_input": "Go to LG India website. Accept the cookies. Search for lg 108cm tv. Buy now a TV that is under 30000. Enter my pincode 500032 and check. Pick free delivery. Go to checkout. Continue as guest. Fill in my name, phone, address and city."
+    },
+    {
+      "id": "LG-02",
+      "name": "Washing machine under 50k, Delhi",
+      "raw_input": "Open LG India. Accept cookies. Search for lg washing machine 7kg. Buy now a washing machine under 50000. Enter pincode 110001 and check. Choose free delivery. Checkout. Continue as guest. Fill my shipping address."
+    },
+    {
+      "id": "LG-03",
+      "name": "Refrigerator under 25k, Mumbai",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg double door refrigerator. Buy now one that is below 25000. Enter pincode 400001 and check delivery. Go to checkout as guest. Fill name, address, phone and city."
+    },
+    {
+      "id": "LG-04",
+      "name": "AC under 40k, Bangalore",
+      "raw_input": "Open LG India. Accept the cookies. Search for lg 1.5 ton ac. Buy now an AC under 40000. Enter pincode 560001 and check. Pick free delivery. Checkout as guest. Fill billing details."
+    },
+    {
+      "id": "LG-05",
+      "name": "Premium TV under 1 lakh, Chennai",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg oled tv 139cm. Buy now a TV under 100000. Enter pincode 600001 and check delivery. Go to checkout. Continue as guest. Fill the address form."
+    },
+    {
+      "id": "LG-06",
+      "name": "Microwave under 15k, Pune",
+      "raw_input": "Open LG India. Accept cookies. Search for lg microwave oven. Buy now one under 15000. Enter pincode 411001 and check. Pick free delivery. Checkout as guest. Fill name, address, phone and city."
+    },
+    {
+      "id": "LG-07",
+      "name": "Water purifier under 20k, Kolkata",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg ro water purifier. Buy now a purifier under 20000. Enter pincode 700001 and check. Go to checkout. Continue as guest. Fill billing and shipping address."
+    },
+    {
+      "id": "LG-08",
+      "name": "Dryer under 60k, Ahmedabad",
+      "raw_input": "Open LG India. Accept cookies. Search for lg dryer 9kg. Buy now one under 60000. Enter pincode 380001 and check. Pick delivery. Checkout as guest. Fill my address."
+    },
+    {
+      "id": "LG-09",
+      "name": "Smart TV under 45k, Jaipur",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg smart tv 125cm. Buy now under 45000. Enter pincode 302001 and check. Free delivery. Checkout as guest. Fill name, address, phone and city."
+    },
+    {
+      "id": "LG-10",
+      "name": "Bottom freezer fridge under 35k, Lucknow",
+      "raw_input": "Open LG India. Accept cookies. Search for lg bottom freezer refrigerator. Buy now one under 35000. Enter pincode 226001 and check. Go to checkout as guest. Fill billing address."
+    },
+    {
+      "id": "LG-11",
+      "name": "Inverter AC under 35k, Coimbatore",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg inverter ac 1 ton. Buy now an AC under 35000. Enter pincode 641001 and check. Free delivery. Checkout. Continue as guest. Fill shipping details."
+    },
+    {
+      "id": "LG-12",
+      "name": "Front load washer under 55k, Chandigarh",
+      "raw_input": "Open LG India. Accept cookies. Search for lg front load washing machine 8kg. Buy now under 55000. Enter pincode 160001 and check. Go to checkout as guest. Fill the address form."
+    },
+    {
+      "id": "LG-13",
+      "name": "Mini fridge under 18k, Kochi",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg single door refrigerator small. Buy now under 18000. Enter pincode 682001 and check. Checkout as guest. Fill name, address, phone and city."
+    },
+    {
+      "id": "LG-14",
+      "name": "TV under 20k, Nagpur",
+      "raw_input": "Open LG India. Accept cookies. Search for lg 80cm tv. Buy now a TV below 20000. Enter pincode 440001 and check. Free delivery. Checkout as guest. Fill billing."
+    },
+    {
+      "id": "LG-15",
+      "name": "Premium fridge under 80k, Surat",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg french door refrigerator. Buy now one under 80000. Enter pincode 395001 and check. Go to checkout. Continue as guest. Fill my address."
+    },
+    {
+      "id": "LG-16",
+      "name": "Dual inverter AC under 45k, Indore",
+      "raw_input": "Open LG India. Accept cookies. Search for lg dual inverter ac 1.5 ton. Buy now under 45000. Enter pincode 452001 and check. Checkout as guest. Fill name, address, phone and city."
+    },
+    {
+      "id": "LG-17",
+      "name": "Semi automatic washing machine under 12k, Bhopal",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg semi automatic washing machine. Buy now under 12000. Enter pincode 462001 and check. Go to checkout as guest. Fill shipping address."
+    },
+    {
+      "id": "LG-18",
+      "name": "4K TV under 55k, Vadodara",
+      "raw_input": "Open LG India. Accept cookies. Search for lg 4k tv 139cm. Buy now a TV under 55000. Enter pincode 390001 and check. Free delivery. Checkout as guest. Fill billing details."
+    },
+    {
+      "id": "LG-19",
+      "name": "Top load washer under 22k, Visakhapatnam",
+      "raw_input": "Go to LG India. Accept cookies. Search for lg top load washing machine 6.5kg. Buy now under 22000. Enter pincode 530001 and check. Go to checkout. Continue as guest. Fill the address form."
+    },
+    {
+      "id": "LG-20",
+      "name": "Split AC under 30k, Thiruvananthapuram",
+      "raw_input": "Open LG India. Accept cookies. Search for lg split ac 1 ton. Buy now an AC under 30000. Enter pincode 695001 and check. Checkout as guest. Fill name, address, phone and city."
+    }
+  ]
+}

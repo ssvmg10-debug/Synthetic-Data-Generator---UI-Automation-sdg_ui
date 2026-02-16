@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 
-// Vite config for local dev; backend runs on BACKEND_PORT (default 8004)
-const backendPort = process.env.BACKEND_PORT || process.env.VITE_BACKEND_PORT || "8004";
+// Vite config for local dev; backend port from env (start_backend writes to .env + frontend/.env)
+const backendPort = process.env.VITE_BACKEND_PORT || process.env.BACKEND_PORT || "8001";
 const backendUrl = `http://localhost:${backendPort}`;
 export default defineConfig({
   plugins: [react()],

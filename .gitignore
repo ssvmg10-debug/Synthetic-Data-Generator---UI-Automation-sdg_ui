@@ -28,7 +28,7 @@ wheels/
 # Virtual Environment
 venv/
 ENV/
-
+.venv/
 # Database
 *.db
 *.sqlite
@@ -63,6 +63,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+frontend/.env
 
 # Temporary files
 *.tmp

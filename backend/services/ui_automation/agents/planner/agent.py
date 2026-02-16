@@ -1,15 +1,54 @@
 """
 UI Test Planner Agent
-Converts raw test case into structured JSON plan with UI intents.
-Uses LLM (Azure GPT) to expand steps and output intent + layered selectors for enterprise UIs.
+Converts raw test case into structured JSON plan with atomic steps and UI intents.
+Works without any API key: splits on "then"/"and", parses actions (navigate, click, type, etc.),
+and generates short step descriptions. Optional: when AZURE_API_KEY is set, LLM can decompose
+or enrich the plan for better semantics.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
 import re
 import logging
 import os
 
 logger = logging.getLogger(__name__)
+
+# Allowed step action types (constrained output – LLM cannot invent others)
+ALLOWED_ACTIONS = {"navigate", "goto", "click", "fill", "type", "select", "press", "wait", "verify", "comment"}
+# Actions that become click when executor runs
+CLICK_LIKE = {"click", "verify"}
+FILL_LIKE = {"fill", "type"}
+
+
+def _shorten_description(line: str, prefix: str = "") -> str:
+    """Turn a long user phrase into a short step description (no API key)."""
+    line = (line or "").strip()
+    if len(line) <= 55:
+        return line if not prefix else (prefix + ": " + line) if line else prefix
+    words = line.split()
+    if len(words) <= 6:
+        return line[:55].rstrip() + ("..." if len(line) > 55 else "")
+    return " ".join(words[:6]) + "..."
+
+
+def _sanitize_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Rule-based sanitization so LLM cannot invent impossible step types.
+    Only allowed actions are kept; unknown actions are coerced to click or dropped.
+    """
+    steps = plan.get("steps") or []
+    sanitized = []
+    for s in steps:
+        action = (s.get("action") or "click").strip().lower()
+        if action not in ALLOWED_ACTIONS:
+            action = "click"
+        s["action"] = action
+        if not s.get("description"):
+            s["description"] = f"Step: {action}"
+        sanitized.append(s)
+    plan["steps"] = sanitized
+    plan["total_steps"] = len(sanitized)
+    return plan
 
 
 def _inject_app_specific_steps(plan: Dict[str, Any]) -> None:
@@ -35,12 +74,18 @@ def _inject_app_specific_steps(plan: Dict[str, Any]) -> None:
         "button:has-text('Accept')",
         "a:has-text('Accept all')",
     ]
+    try:
+        from services.ui_automation.intent import get_locator_hint_for_intent
+        cookie_hint = get_locator_hint_for_intent("cookie_accept")
+    except Exception:
+        cookie_hint = {"role": "button", "name": "Accept all"}
     cookie_step = {
         "action": "click",
         "element": "Accept all / cookie consent",
         "description": "Accept cookie consent banner (injected for this application)",
         "intent": "cookie_accept",
         "semantic_target": "button",
+        "locator_hint": cookie_hint,
         "selector_hints": hints,
         "selectors": hints[:6],
         "selector": hints[0] if hints else "button:has-text('Accept all')",
@@ -52,28 +97,141 @@ def _inject_app_specific_steps(plan: Dict[str, Any]) -> None:
     logger.info("Injected cookie_accept step after navigate for %s (%s steps)", url[:50], len(steps))
 
 
+def _parse_price_condition(description: str, element: str) -> Optional[Dict[str, Any]]:
+    """Detect numeric constraints (e.g. under 30000, below 30k) for select_product_with_condition."""
+    text = f" {description or ''} {element or ''} ".lower()
+    # under 30000, below 30k, under ₹30000, less than 25000, < 40000
+    match = re.search(r"(?:under|below|less than|<)\s*[^\d]*(?:₹|rs\.?|inr)?\s*([0-9,]+)\s*(k|000)?", text, re.I)
+    if match:
+        raw = match.group(1).replace(",", "")
+        try:
+            n = int(raw)
+            if match.lastindex >= 2 and match.group(2):
+                n = n * 1000
+            return {"price_max": n}
+        except ValueError:
+            pass
+    m = re.search(r"\b(\d{4,6})\s*(?:and under|or less)\b", text)
+    if m:
+        try:
+            return {"price_max": int(m.group(1))}
+        except ValueError:
+            pass
+    return None
+
+
 def _add_intents_to_steps(plan: Dict[str, Any]) -> None:
-    """Add intent, semantic_target, fallback_semantics and selector_hints to each step (enterprise-grade)."""
+    """Add intent, semantic_target, condition (for select_product_with_condition), and locator_hint."""
     try:
-        from services.ui_automation.intent import classify_intent, get_intent_semantics, get_selector_hints_for_intent
+        from services.ui_automation.intent import (
+            classify_intent,
+            get_intent_semantics,
+            get_selector_hints_for_intent,
+            get_locator_hint_for_intent,
+        )
     except ImportError:
         return
     for step in plan.get("steps", []):
+        # Preserve injected cookie_accept intent so it is not overwritten
+        if step.get("intent") == "cookie_accept":
+            hint = get_locator_hint_for_intent("cookie_accept")
+            if hint:
+                step["locator_hint"] = hint
+            continue
         action = step.get("action", "")
         element = step.get("element", "")
         description = step.get("description", "")
         intent = classify_intent(action, element, description)
+        # Enterprise: detect price condition for Buy Now / product select -> semantic action
+        condition = _parse_price_condition(description, element)
+        if condition and intent in ("product_select", "add_to_cart"):
+            intent = "select_product_with_condition"
+            step["condition"] = condition
+            step["semantic_action"] = "select_product_with_condition"
         step["intent"] = intent
         semantics = get_intent_semantics(intent)
         step["semantic_target"] = semantics.get("semantic_target", "button/link")
         step["fallback_semantics"] = semantics.get("fallback_semantics", [])
         hints = get_selector_hints_for_intent(intent)
         step["selector_hints"] = hints
+        locator_hint = get_locator_hint_for_intent(intent)
+        if locator_hint:
+            step["locator_hint"] = locator_hint
         if not step.get("selector") and hints:
             step["selector"] = hints[0] if isinstance(hints[0], str) else hints[0].get("selector", "")
         if hints and not step.get("selectors"):
             step["selectors"] = hints[:5]
-    logger.info("Added UI intents to %s steps", len(plan.get("steps", [])))
+    logger.info("Added UI intents (and locator_hint where available) to %s steps", len(plan.get("steps", [])))
+
+
+def _decompose_raw_input_with_llm(raw_input: str) -> Optional[Dict[str, Any]]:
+    """
+    Use LLM to break down the user's natural-language scenario into atomic test steps.
+    Each step is ONE action (navigate, click, type, etc.) with a short description.
+    Returns a plan dict with url and steps, or None if LLM is unavailable or fails.
+    """
+    try:
+        from utils.azure_openai import chat_completion, create_system_message, create_user_message
+    except ImportError:
+        return None
+    if not os.getenv("AZURE_API_KEY"):
+        return None
+    sys_msg = """You are a UI test planner. Your job is to convert the user's test scenario into a list of ATOMIC steps.
+Each step must be exactly ONE action: one navigate, one click, one type, one select, or one wait.
+- Break compound instructions into separate steps. Example: "click on search and search for lg tv" must become:
+  1) Click search icon/open search
+  2) Type "lg tv" in search input
+  3) Click search submit button
+- Use SHORT descriptions (e.g. "Accept cookie banner", "Click search icon", "Type pincode 500032", "Click Buy Now for product under 30000").
+- Extract the starting URL from the scenario (e.g. "navigate to https://www.lg.com/in" -> url: "https://www.lg.com/in", step 1: navigate to that URL).
+- For "fill pincode as 500032" use one step: type 500032 in pincode field.
+- For "click checkout then continue as guest" use two steps: click checkout, then click continue as guest.
+Output ONLY a JSON object with keys:
+- "url": string (the main URL to start on, or empty string)
+- "steps": array of objects, each with: "step" (1-based number), "action" (navigate|click|type|select|verify|wait), "description" (short phrase), "element" (optional), "value" (optional, for type/navigate)
+Return only valid JSON, no markdown or explanation."""
+    user_content = "Test scenario:\n" + raw_input
+    try:
+        resp = chat_completion(
+            messages=[create_system_message(sys_msg), create_user_message(user_content)],
+            temperature=0.2,
+            max_tokens=3000,
+        )
+        text = (resp or "").strip()
+        if "```" in text:
+            text = re.sub(r"^.*?```(?:json)?\s*", "", text).strip()
+            text = re.sub(r"```.*$", "", text).strip()
+        out = json.loads(text)
+        if not isinstance(out, dict) or "steps" not in out or not isinstance(out["steps"], list):
+            return None
+        steps = out["steps"]
+        if len(steps) == 0:
+            return None
+        url = out.get("url") or ""
+        for i, s in enumerate(steps):
+            if not isinstance(s, dict):
+                continue
+            s["step"] = i + 1
+            if "action" in s and isinstance(s["action"], str):
+                s["action"] = s["action"].lower().strip()
+            if "description" not in s or not s["description"]:
+                s["description"] = s.get("element") or ("Step %d" % (i + 1))
+        if not url:
+            for s in steps:
+                if isinstance(s, dict) and (s.get("action") == "navigate" or s.get("action") == "goto") and s.get("value"):
+                    url = s["value"]
+                    break
+        plan = {
+            "test_name": "Generated Test",
+            "url": url or "https://example.com",
+            "steps": steps,
+            "total_steps": len(steps),
+        }
+        logger.info("LLM decomposed scenario into %s atomic steps", len(steps))
+        return plan
+    except Exception as e:
+        logger.warning("LLM decompose failed: %s", e)
+        return None
 
 
 def _enrich_plan_with_llm(plan: Dict[str, Any]) -> Dict[str, Any]:
@@ -140,35 +298,66 @@ class PlannerAgent:
             'wait': ['wait', 'pause']
         }
     
+    def _split_into_atomic_phrases(self, text: str) -> List[str]:
+        """Split user scenario into smaller phrases so each can become one atomic step (no API key needed)."""
+        text = (text or "").strip().strip(".,;")
+        if not text:
+            return []
+        # First split on sentence-like boundaries
+        parts = re.split(r"\s+then\s+|\s*\.\s+|\s*;\s+", text, flags=re.IGNORECASE)
+        parts = [p.strip().strip(".,;") for p in parts if p.strip()]
+        result = []
+        for p in parts:
+            # Within each part, split on " and " when it joins two actions (e.g. "click search and search for X" -> click search, search for X)
+            if len(p) > 60 or (" and " in p.lower() and re.search(r"\b(click|type|fill|search|open|select|press)\b", p.lower())):
+                sub = re.split(r"\s+and\s+", p, flags=re.IGNORECASE)
+                sub = [s.strip().strip(".,") for s in sub if s.strip()]
+                if len(sub) > 1:
+                    result.extend(sub)
+                    continue
+            result.append(p)
+        return result
+
     def plan(self, raw_input: str) -> Dict[str, Any]:
-        """Convert raw test case to structured plan. Splits on newlines or ' then ' / '. ' for paragraph input."""
-        lines = [line.strip() for line in raw_input.split('\n') if line.strip()]
-        # If single long line (paragraph), split on " then " or ". " to get multiple steps
-        if len(lines) == 1 and len(lines[0]) > 80:
-            paragraph = lines[0]
-            for sep in [" then ", ". "]:
-                if sep in paragraph.lower():
-                    parts = re.split(r"\s*" + re.escape(sep) + r"\s*", paragraph, flags=re.IGNORECASE)
-                    parts = [p.strip().strip(".,;").strip() for p in parts if p.strip()]
-                    if len(parts) > 1:
-                        lines = parts
-                        break
+        """Convert raw test case to structured plan. Uses built-in splitting + short descriptions (no API key required). LLM is optional enhancement."""
+        raw = (raw_input or "").strip()
+        if not raw:
+            return {"test_name": "Generated Test", "url": "https://example.com", "steps": [], "total_steps": 0}
+
+        # Optional: use LLM for atomic steps when API key is set (better semantics)
+        if self.use_llm and len(raw) > 60:
+            llm_plan = _decompose_raw_input_with_llm(raw)
+            if llm_plan and len(llm_plan.get("steps", [])) >= 2:
+                _add_intents_to_steps(llm_plan)
+                _inject_app_specific_steps(llm_plan)
+                return _sanitize_plan(llm_plan)
+
+        # Built-in path (no API key): split into atomic phrases and parse each with short descriptions
+        lines = [line.strip() for line in raw.split('\n') if line.strip()]
+        if len(lines) == 1:
+            lines = self._split_into_atomic_phrases(lines[0]) or lines
+        else:
+            expanded = []
+            for line in lines:
+                if len(line) > 80:
+                    expanded.extend(self._split_into_atomic_phrases(line))
+                else:
+                    expanded.append(line)
+            lines = expanded if expanded else lines
+
         steps = []
         test_name = "Generated Test"
         url = None
-
         for i, line in enumerate(lines):
-            # Try to extract test name from first line
-            if i == 0 and not any(keyword in line.lower() for keywords in self.action_keywords.values() for keyword in keywords):
+            if i == 0 and not any(kw in line.lower() for kws in self.action_keywords.values() for kw in kws):
                 test_name = line
                 continue
-            
             step = self._parse_step(line, i + 1)
             if step:
                 steps.append(step)
-                if step['action'] == 'navigate' and not url:
+                if step.get('action') == 'navigate' and not url:
                     url = step.get('value')
-        
+
         plan = {
             "test_name": test_name,
             "url": url or "https://example.com",
@@ -180,6 +369,7 @@ class PlannerAgent:
         else:
             _add_intents_to_steps(plan)
         _inject_app_specific_steps(plan)
+        plan = _sanitize_plan(plan)
         return plan
     
     def _parse_step(self, line: str, step_number: int) -> Dict[str, Any]:
@@ -194,55 +384,62 @@ class PlannerAgent:
                 "step": step_number,
                 "action": "navigate",
                 "value": url,
-                "description": line
+                "description": "Navigate to " + (url[:50] + "..." if len(url) > 50 else url),
             }
         
         # Click action
         elif any(kw in line_lower for kw in self.action_keywords['click']):
             element = self._extract_element(line)
+            short = (element and element != "unknown") and ("Click " + element) or _shorten_description(line, "Click")
             return {
                 "step": step_number,
                 "action": "click",
                 "element": element,
                 "selector": self._generate_selector(element),
-                "description": line
+                "description": short,
             }
         
         # Type action
         elif any(kw in line_lower for kw in self.action_keywords['type']):
             element, value = self._extract_element_and_value(line)
+            if value:
+                short = "Type '%s' in %s" % (value[:40] + "..." if len(value) > 40 else value, element or "field")
+            else:
+                short = _shorten_description(line, "Fill")
             return {
                 "step": step_number,
                 "action": "type",
                 "element": element,
                 "selector": self._generate_selector(element),
                 "value": value,
-                "description": line
+                "description": short,
             }
         
         # Select action
         elif any(kw in line_lower for kw in self.action_keywords['select']):
             element, value = self._extract_element_and_value(line)
+            short = (value and ("Select %s" % value[:40])) or ("Select " + (element or "option"))
             return {
                 "step": step_number,
                 "action": "select",
                 "element": element,
                 "selector": self._generate_selector(element),
                 "value": value,
-                "description": line
+                "description": short,
             }
         
         # Verify action
         elif any(kw in line_lower for kw in self.action_keywords['verify']):
             element = self._extract_element(line)
             expected = self._extract_expected_value(line)
+            short = ("Verify %s" % (expected or element or "result")) or _shorten_description(line, "Verify")
             return {
                 "step": step_number,
                 "action": "verify",
                 "element": element,
                 "selector": self._generate_selector(element),
                 "expected": expected,
-                "description": line
+                "description": short,
             }
         
         # Wait action
@@ -252,14 +449,14 @@ class PlannerAgent:
                 "step": step_number,
                 "action": "wait",
                 "duration": duration,
-                "description": line
+                "description": "Wait %d ms" % duration,
             }
         
-        # Default: treat as comment/description
+        # Default: short description from line
         return {
             "step": step_number,
             "action": "comment",
-            "description": line
+            "description": _shorten_description(line, "Step"),
         }
     
     def _extract_element(self, line: str) -> str:

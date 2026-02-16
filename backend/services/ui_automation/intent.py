@@ -8,26 +8,69 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Intent taxonomy: intent -> semantic_target (preferred element type) and fallback semantics
+# Playwright locator_hint: prefer get_by_role / get_by_placeholder / get_by_label (resilient to DOM changes)
+# Keys: role, name (optional, for role), placeholder, label. Executor tries these before CSS selector.
+LOCATOR_HINT_KEY = "locator_hint"
+
+# Intent taxonomy: intent -> semantic_target, fallback_semantics, selector_hints, and optional locator_hint
 INTENT_TAXONOMY: Dict[str, Dict[str, Any]] = {
     "search_box": {
         "semantic_target": "input/search",
         "fallback_semantics": ["input", "input[type=search]", "input[placeholder*='Search']", "[aria-label*='Search']", "search icon", "button with search icon"],
-        "selector_hints": ["input[type='search']", "input[placeholder*='Search']", "input[name*='search']", "[aria-label*='Search']", "input[type='text']"],
+        "locator_hint": {"role": "searchbox"},
+        "selector_hints": [
+            "input[type='search']",
+            "input[name='q']",
+            "input[name='search']",
+            "input[placeholder*='Search']",
+            "input[aria-label*='Search']",
+            "[role='search'] input",
+            "input[type='text']",
+        ],
+    },
+    "search_icon": {
+        "semantic_target": "link/button",
+        "fallback_semantics": ["search", "search icon", "open search", "search link"],
+        "locator_hint": {"role": "link", "name": "Search"},
+        "selector_hints": [
+            "a:has-text('Search')",
+            "button:has-text('Search')",
+            "[aria-label*='Search']",
+            ".search-icon",
+            "[href*='search']",
+            "nav a:has-text('Search')",
+        ],
     },
     "search_submit": {
         "semantic_target": "button/submit",
         "fallback_semantics": ["button", "submit", "search button", "magnifying icon"],
-        "selector_hints": ["button[type='submit']", "button:has-text('Search')", "[aria-label*='Search']", "button:has(svg)"],
+        "locator_hint": {"role": "button", "name": "Search"},
+        "selector_hints": [
+            "button[type='submit']",
+            "form[role='search'] button[type='submit']",
+            "[aria-label*='Search']",
+            "button:has-text('Search')",
+            "button:has(svg)",
+        ],
     },
     "cookie_accept": {
         "semantic_target": "button",
         "fallback_semantics": ["Accept all", "Accept", "I agree", "OK", "Close cookie", "Save & Proceed", "Reject All"],
-        "selector_hints": ["button:has-text('Accept')", "button:has-text('Accept all')", "[id*='cookie'] button", ".cookie-accept", "button:has-text('I agree')"],
+        "locator_hint": {"role": "button", "name": "Accept all"},
+        "selector_hints": [
+            "[role='button']:has-text('Accept all')",
+            "button:has-text('Accept all')",
+            "button:has-text('Accept')",
+            "a:has-text('Accept all')",
+            "[id*='cookie'] button",
+            ".cookie-accept",
+            "button:has-text('I agree')",
+        ],
     },
     "login": {
         "semantic_target": "button/link",
         "fallback_semantics": ["Sign in", "Login", "Log in", "Sign in button"],
+        "locator_hint": {"role": "link", "name": "Sign in"},
         "selector_hints": ["a:has-text('Sign in')", "a:has-text('Login')", "button:has-text('Sign in')", "[href*='login']"],
     },
     "product_select": {
@@ -35,44 +78,63 @@ INTENT_TAXONOMY: Dict[str, Dict[str, Any]] = {
         "fallback_semantics": ["product link", "Buy now", "Add to cart", "product card"],
         "selector_hints": ["a[href*='product']", ".product a", "button:has-text('Buy now')", "button:has-text('Add to cart')", "[data-product]"],
     },
+    "select_product_with_condition": {
+        "semantic_target": "product_card",
+        "fallback_semantics": ["product under price", "Buy now under", "first product below"],
+        "selector_hints": ["button:has-text('Buy Now')", "a:has-text('Know More')", ".cmp-button"],
+    },
     "add_to_cart": {
         "semantic_target": "button",
         "fallback_semantics": ["Add to cart", "Add to bag", "Buy"],
+        "locator_hint": {"role": "button", "name": "Add to cart"},
         "selector_hints": ["button:has-text('Add to cart')", "[id*='add-to-cart']", ".add-to-cart", "button[name='add']"],
     },
     "cart": {
         "semantic_target": "link/button",
         "fallback_semantics": ["Cart", "View cart", "My cart", "Basket"],
+        "locator_hint": {"role": "link", "name": "Cart"},
         "selector_hints": ["a[href*='cart']", "a:has-text('Cart')", "[aria-label*='cart']", ".cart-icon"],
     },
     "checkout": {
         "semantic_target": "button/link",
         "fallback_semantics": ["Checkout", "Check out", "Proceed to checkout"],
+        "locator_hint": {"role": "button", "name": "Checkout"},
         "selector_hints": ["button:has-text('Checkout')", "a:has-text('Checkout')", "[data-action='checkout']", ".checkout-btn"],
     },
     "guest_checkout": {
         "semantic_target": "button/link",
         "fallback_semantics": ["Continue as guest", "Guest", "Continue as guest or Continue"],
+        "locator_hint": {"role": "button", "name": "Continue as guest"},
         "selector_hints": ["button:has-text('Continue as guest')", "button:has-text('Guest')", "a:has-text('Continue as guest')", "button:has-text('Continue')"],
     },
     "email_field": {
         "semantic_target": "input",
         "fallback_semantics": ["email", "Email address"],
+        "locator_hint": {"role": "textbox", "name": "email"},
         "selector_hints": ["input[type='email']", "input[name*='email']", "input[placeholder*='Email']", "#email"],
     },
     "pincode_zip": {
         "semantic_target": "input",
         "fallback_semantics": ["pincode", "zip", "postal code", "postcode"],
+        "locator_hint": {"placeholder": "Pincode"},
         "selector_hints": ["input[name*='zip']", "input[name*='postal']", "input[placeholder*='Pincode']", "input[placeholder*='Zip']", "#zip", "#pincode"],
+    },
+    "pincode_check": {
+        "semantic_target": "button",
+        "fallback_semantics": ["Check", "Check availability", "Verify pincode"],
+        "locator_hint": {"role": "button", "name": "Check"},
+        "selector_hints": ["button:has-text('Check')", "button:has-text('Check availability')", "[aria-label*='Check']"],
     },
     "billing_shipping": {
         "semantic_target": "input/textarea",
         "fallback_semantics": ["address", "name", "phone", "city", "state", "billing", "shipping"],
+        "locator_hint": {"placeholder": "Address"},
         "selector_hints": ["input[name*='address']", "input[name*='name']", "input[name*='phone']", "input[name*='city']", "textarea[name*='address']"],
     },
     "pay_now": {
         "semantic_target": "button",
         "fallback_semantics": ["Pay now", "Place order", "Submit order"],
+        "locator_hint": {"role": "button", "name": "Pay now"},
         "selector_hints": ["button:has-text('Pay now')", "button[type='submit']", "[name='paynow']", "button:has-text('Place order')"],
     },
     "menu_shop": {
@@ -114,7 +176,9 @@ def classify_intent(action: str, element: str, description: str = "") -> str:
         return "generic_type"
 
     if action == "click":
-        if any(w in el or w in desc for w in ["search", "search icon", "search button", "magnify"]):
+        if any(w in el or w in desc for w in ["search option", "search icon", "open search", "click search"]):
+            return "search_icon"
+        if any(w in el or w in desc for w in ["search", "search button", "magnify"]):
             return "search_submit" if "submit" in el or "button" in el else "search_box"
         if any(w in el or w in desc for w in ["cookie", "accept all", "accept", "privacy", "i agree", "reject all"]):
             return "cookie_accept"
@@ -126,6 +190,8 @@ def classify_intent(action: str, element: str, description: str = "") -> str:
             return "cart"
         if any(w in el or w in desc for w in ["checkout", "check out", "proceed"]):
             return "checkout"
+        if any(w in el or w in desc for w in ["check", "check availability", "check pincode"]) and any(w in (el + " " + desc) for w in ["pincode", "zip", "delivery", "availability"]):
+            return "pincode_check"
         if any(w in el or w in desc for w in ["guest", "continue as guest", "complete purchase as guest"]):
             return "guest_checkout"
         if any(w in el or w in desc for w in ["pay now", "place order", "paynow"]):
@@ -150,3 +216,14 @@ def get_selector_hints_for_intent(intent: str) -> List[str]:
     if not entry:
         return []
     return list(entry.get("selector_hints", []))
+
+
+def get_locator_hint_for_intent(intent: str) -> Optional[Dict[str, Any]]:
+    """Return Playwright locator_hint (role/placeholder/label) for this intent. Executor uses get_by_role/get_by_placeholder first."""
+    entry = INTENT_TAXONOMY.get(intent)
+    if not entry:
+        return None
+    hint = entry.get("locator_hint")
+    if isinstance(hint, dict) and hint:
+        return hint
+    return None

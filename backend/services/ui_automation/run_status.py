@@ -99,7 +99,7 @@ class RunStatusTracker:
         self.status = "running"
         self.error: Optional[str] = None
         
-        logger.info(f"RunStatusTracker initialized for run_id={run_id}")
+        logger.debug(f"RunStatusTracker initialized for run_id={run_id}")
     
     def _initialize_phases(self):
         """Initialize all phases with pending status"""
@@ -126,7 +126,7 @@ class RunStatusTracker:
             "started_at": datetime.utcnow().isoformat()
         })
         
-        logger.info(f"[{self.run_id}] Started phase: {phase.value}")
+        logger.debug(f"[{self.run_id}] Started phase: {phase.value}")
     
     def complete_phase(
         self,
@@ -157,7 +157,7 @@ class RunStatusTracker:
             "result": result
         })
         
-        logger.info(f"[{self.run_id}] Completed phase: {phase.value} ({duration_ms}ms)")
+        logger.debug(f"[{self.run_id}] Completed phase: {phase.value} ({duration_ms}ms)")
     
     def fail_phase(
         self,
@@ -206,7 +206,7 @@ class RunStatusTracker:
             "result": {"reason": reason}
         })
         
-        logger.info(f"[{self.run_id}] Skipped phase: {phase.value} - {reason}")
+        logger.debug(f"[{self.run_id}] Skipped phase: {phase.value} - {reason}")
     
     def add_screenshot(
         self,
@@ -234,7 +234,7 @@ class RunStatusTracker:
         
         self.screenshots.append(screenshot)
         
-        logger.info(
+        logger.debug(
             f"[{self.run_id}] Screenshot added: {path} "
             f"(step={step_number}, phase={phase})"
         )
@@ -268,7 +268,7 @@ class RunStatusTracker:
         
         self.healing_attempts.append(attempt)
         
-        logger.info(
+        logger.debug(
             f"[{self.run_id}] Healing attempt: step={step_number}, "
             f"strategy={strategy}, success={success}"
         )
@@ -291,7 +291,7 @@ class RunStatusTracker:
         
         duration_s = (self.completed_at - self.started_at).total_seconds()
         
-        logger.info(
+        logger.debug(
             f"[{self.run_id}] Run completed: status={self.status}, "
             f"duration={duration_s:.2f}s"
         )
@@ -393,4 +393,4 @@ def cleanup_old_trackers(max_age_hours: int = 24):
         del _run_trackers[run_id]
     
     if to_remove:
-        logger.info(f"Cleaned up {len(to_remove)} old trackers")
+        logger.debug(f"Cleaned up {len(to_remove)} old trackers")

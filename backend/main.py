@@ -42,12 +42,17 @@ app = FastAPI(
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log every incoming request so you can see what is running in the backend terminal."""
+    """Log every incoming request so you can see what is running in the backend terminal.
+    Skips high-frequency polling endpoints that clutter logs (run status, chats list).
+    """
     method = request.method
     path = request.url.path
-    logger.info("[REQUEST] %s %s", method, path)
+    skip_log = path in ("/ui/current-run/status", "/chats") and method == "GET"
+    if not skip_log:
+        logger.info("[REQUEST] %s %s", method, path)
     response = await call_next(request)
-    logger.info("[RESPONSE] %s %s -> %s", method, path, response.status_code)
+    if not skip_log:
+        logger.info("[RESPONSE] %s %s -> %s", method, path, response.status_code)
     return response
 
 
