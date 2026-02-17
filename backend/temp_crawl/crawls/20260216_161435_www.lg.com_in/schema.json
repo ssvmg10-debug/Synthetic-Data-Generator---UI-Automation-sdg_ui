@@ -1,0 +1,48 @@
+{
+  "source": "ui",
+  "fields": [
+    {
+      "name": "LGCOM_NECESSARY",
+      "type": "boolean",
+      "required": false,
+      "label": "Absolutely Necessary Cookies",
+      "constraints": {}
+    },
+    {
+      "name": "LGCOM_IMPROVEMENTS",
+      "type": "boolean",
+      "required": false,
+      "label": "Functional Cookies",
+      "constraints": {}
+    },
+    {
+      "name": "LGCOM_SOCIAL_MEDIA",
+      "type": "boolean",
+      "required": false,
+      "label": "Social media",
+      "constraints": {}
+    },
+    {
+      "name": "LGCOM_ANALYSIS_OF_SITE",
+      "type": "boolean",
+      "required": false,
+      "label": "Analytics Cookies",
+      "constraints": {}
+    },
+    {
+      "name": "LGCOM_ADVERTISING",
+      "type": "boolean",
+      "required": false,
+      "label": "Advertising Cookies",
+      "constraints": {}
+    },
+    {
+      "name": "countryVal",
+      "type": "string",
+      "required": false,
+      "label": "countryVal",
+      "constraints": {}
+    }
+  ],
+  "total_fields": 6
+}

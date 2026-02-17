@@ -30,6 +30,7 @@ from .decision_engine import DecisionEngine, NextAction, SemanticAction
 from .goal_extractor import GoalObject, extract_goal
 from .components import (
     HomePageComponent,
+    NavigationComponent,
     SearchResultsComponent,
     ProductPageComponent,
     CartPageComponent,
@@ -250,100 +251,122 @@ class FlowEngine:
         action = next_action.action
         params = next_action.params
 
-        if action == SemanticAction.ACCEPT_COOKIES:
-            comp = HomePageComponent(self.page)
-            return await comp.accept_cookies()
+        logger.info(f"🎯 Executing: {action.value} | {next_action.reason}")
 
-        if action == SemanticAction.SEARCH:
-            comp = HomePageComponent(self.page)
-            return await comp.search(params.get("query", ""))
+        try:
+            if action == SemanticAction.ACCEPT_COOKIES:
+                comp = HomePageComponent(self.page)
+                result = await comp.accept_cookies()
+                logger.info(f"{'✅' if result else '❌'} ACCEPT_COOKIES: {result}")
+                return result
 
-        if action == SemanticAction.SELECT_PRODUCT:
-            comp = SearchResultsComponent(self.page)
-            return await comp.select_product_under_price(params.get("price_max"))
+            if action == SemanticAction.NAVIGATE_MENU:
+                result = await self._execute_navigation(params)
+                logger.info(f"{'✅' if result else '❌'} NAVIGATE_MENU: {result}")
+                return result
 
-        if action == SemanticAction.ADD_TO_CART:
-            comp = ProductPageComponent(self.page)
-            return await comp.add_to_cart()
+            if action == SemanticAction.SEARCH:
+                comp = HomePageComponent(self.page)
+                result = await comp.search(params.get("query", ""))
+                logger.info(f"{'✅' if result else '❌'} SEARCH: {result}")
+                return result
 
-        if action == SemanticAction.FILL_PINCODE:
-            comp = CartPageComponent(self.page)
-            return await comp.fill_pincode_and_check(params.get("pincode", "500032"))
+            if action == SemanticAction.SELECT_PRODUCT:
+                comp = SearchResultsComponent(self.page)
+                result = await comp.select_product_under_price(params.get("price_max"))
+                logger.info(f"{'✅' if result else '❌'} SELECT_PRODUCT: {result}")
+                return result
 
-        if action == SemanticAction.SELECT_FREE_DELIVERY:
-            comp = CartPageComponent(self.page)
-            return await comp.select_free_delivery()
+            if action == SemanticAction.ADD_TO_CART:
+                comp = ProductPageComponent(self.page)
+                result = await comp.add_to_cart()
+                logger.info(f"{'✅' if result else '❌'} ADD_TO_CART: {result}")
+                return result
 
-        if action == SemanticAction.PROCEED_TO_CHECKOUT:
-            comp = CartPageComponent(self.page)
-            return await comp.proceed_to_checkout()
+            if action == SemanticAction.FILL_PINCODE:
+                comp = CartPageComponent(self.page)
+                result = await comp.fill_pincode_and_check(params.get("pincode", "500032"))
+                logger.info(f"{'✅' if result else '❌'} FILL_PINCODE: {result}")
+                return result
 
-        if action == SemanticAction.CONTINUE_AS_GUEST:
-            comp = CheckoutPageComponent(self.page)
-            return await comp.continue_as_guest()
+            if action == SemanticAction.SELECT_FREE_DELIVERY:
+                comp = CartPageComponent(self.page)
+                result = await comp.select_free_delivery()
+                logger.info(f"{'✅' if result else '❌'} SELECT_FREE_DELIVERY: {result}")
+                return result
 
-        if action == SemanticAction.FILL_ADDRESS:
-            comp = CheckoutPageComponent(self.page)
-            # Use Test Data Vault (env/defaults); params from decision can override
-            addr = get_synthetic_address(override=params or {})
-            return await comp.fill_billing_address(
-                name=addr.get("name", "Test User"),
-                address=addr.get("address", "123 Test St"),
-                phone=addr.get("phone", "9876543210"),
-                city=addr.get("city", "Hyderabad"),
-            )
+            if action == SemanticAction.PROCEED_TO_CHECKOUT:
+                comp = CartPageComponent(self.page)
+                result = await comp.proceed_to_checkout()
+                logger.info(f"{'✅' if result else '❌'} PROCEED_TO_CHECKOUT: {result}")
+                return result
 
-        if action == SemanticAction.CLOSE_MODAL:
-            try:
-                btn = self.page.get_by_role("button", name="Close").first
-                await btn.click(timeout=5000)
-                return True
-            except Exception:
-                pass
+            if action == SemanticAction.CONTINUE_AS_GUEST:
+                comp = CheckoutPageComponent(self.page)
+                result = await comp.continue_as_guest()
+                logger.info(f"{'✅' if result else '❌'} CONTINUE_AS_GUEST: {result}")
+                return result
+
+            if action == SemanticAction.FILL_ADDRESS:
+                comp = CheckoutPageComponent(self.page)
+                # Use Test Data Vault (env/defaults); params from decision can override
+                addr = get_synthetic_address(override=params or {})
+                result = await comp.fill_billing_address(
+                    name=addr.get("name", "Test User"),
+                    address=addr.get("address", "123 Test St"),
+                    phone=addr.get("phone", "9876543210"),
+                    city=addr.get("city", "Hyderabad"),
+                )
+                logger.info(f"{'✅' if result else '❌'} FILL_ADDRESS: {result}")
+                return result
+
+            if action == SemanticAction.CLOSE_MODAL:
+                try:
+                    btn = self.page.get_by_role("button", name="Close").first
+                    await btn.click(timeout=5000)
+                    logger.info("✅ CLOSE_MODAL: True")
+                    return True
+                except Exception as e:
+                    logger.warning(f"❌ CLOSE_MODAL failed: {e}")
+                logger.info("❌ CLOSE_MODAL: False")
+                return False
+
+            if action == SemanticAction.EXPLORATORY_CLICK:
+                result = await self._execute_exploratory_click(params)
+                logger.info(f"{'✅' if result else '❌'} EXPLORATORY_CLICK: {result}")
+                return result
+
+            logger.warning(f"❌ Unknown action: {action.value}")
+            return False
+        
+        except Exception as e:
+            logger.error(f"❌ Action execution failed for {action.value}: {e}", exc_info=True)
             return False
 
-        if action == SemanticAction.EXPLORATORY_CLICK:
-            return await self._execute_exploratory_click(params)
-
+    async def _execute_navigation(self, params: Dict[str, Any]) -> bool:
+        """Navigate by clicking menu/navigation items."""
+        candidates = params.get("candidates", [])
+        logger.info(f"🧭 Trying to navigate via menu: {candidates}")
+        
+        nav = NavigationComponent(self.page)
+        
+        # Try each candidate navigation item
+        for keyword in candidates:
+            result = await nav.click_navigation_item(keyword, exact=False)
+            if result:
+                return True
+        
+        logger.warning(f"❌ Could not navigate using any of: {candidates}")
         return False
 
     async def _execute_exploratory_click(self, params: Dict[str, Any]) -> bool:
         """Recovery: click first visible button matching candidates."""
         candidates = params.get("candidates", ["Search", "Buy", "Know More", "Continue", "Proceed"])
-        visible = params.get("visible_buttons", [])
-        # Prefer visible buttons that match candidates
-        for kw in candidates:
-            try:
-                loc = self.page.get_by_role("button", name=re.compile(re.escape(kw), re.I))
-                if await loc.count() > 0:
-                    await loc.first.scroll_into_view_if_needed(timeout=3000)
-                    await loc.first.click(timeout=8000)
-                    await self.page.wait_for_timeout(1500)
-                    return True
-            except Exception:
-                pass
-            try:
-                loc = self.page.get_by_role("link", name=re.compile(re.escape(kw), re.I))
-                if await loc.count() > 0:
-                    await loc.first.scroll_into_view_if_needed(timeout=3000)
-                    await loc.first.click(timeout=8000)
-                    await self.page.wait_for_timeout(1500)
-                    return True
-            except Exception:
-                pass
-        # Fallback: try first visible from visible_buttons list
-        for txt in visible[:5]:
-            if len(txt) < 3 or len(txt) > 60:
-                continue
-            try:
-                loc = self.page.get_by_role("button", name=re.compile(re.escape(txt[:30]), re.I))
-                if await loc.count() > 0:
-                    await loc.first.click(timeout=5000)
-                    await self.page.wait_for_timeout(1500)
-                    return True
-            except Exception:
-                pass
-        return False
+        
+        nav = NavigationComponent(self.page)
+        result = await nav.click_any_visible_button(candidates)
+        
+        return result
 
     async def _validate_after_action(
         self,
@@ -409,7 +432,13 @@ class FlowEngine:
             filename = f"{name}_{timestamp}.png"
             filepath = os.path.join(self.screenshot_dir, filename)
             await self.page.screenshot(path=filepath, full_page=False)
+            
+            # Also save as live.png for real-time UI viewing
+            live_path = os.path.join(self.screenshot_dir, "live.png")
+            await self.page.screenshot(path=live_path, full_page=False)
+            
+            logger.debug(f"📸 Screenshot saved: {filename}")
             return filepath
         except Exception as e:
-            logger.debug("Flow screenshot failed: %s", e)
+            logger.warning(f"Flow screenshot failed: {e}")
             return ""

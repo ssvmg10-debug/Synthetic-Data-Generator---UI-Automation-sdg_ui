@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class SemanticAction(str, Enum):
     """Domain-level semantic actions (not low-level click/fill)."""
     ACCEPT_COOKIES = "accept_cookies"
+    NAVIGATE_MENU = "navigate_menu"  # Click on menu/navigation items
     SEARCH = "search"
     EXPLORATORY_CLICK = "exploratory_click"  # Recovery: click first visible primary button
     SELECT_PRODUCT = "select_product"
@@ -149,9 +150,14 @@ class DecisionEngine:
             # Listing with 1 result: click to go to detail first
             return NextAction(SemanticAction.SELECT_PRODUCT, {"price_max": goal.price_max}, "Select product (1 result)")
 
-        # Goal: checkout (cart visible, complete_purchase, not yet in checkout)
+        # Goal: checkout (cart visible OR in cart page, complete_purchase, not yet in checkout)
+        # IMPORTANT: Only proceed to checkout if we actually have items in cart or are on cart page
         if goal.complete_purchase and not state.checkout_started:
-            if (world.cart and world.cart.is_visible) or "cart" in (world.url or "").lower():
+            # Only try checkout if cart has items OR we're on the cart page
+            in_cart_page = "cart" in (world.url or "").lower()
+            has_cart_items = world.cart and world.cart.is_visible and (world.cart.count or 0) > 0
+            
+            if in_cart_page or has_cart_items:
                 if _button_matches(world.visible_buttons, "Checkout", "Proceed", "Place order", "Buy now"):
                     return NextAction(SemanticAction.PROCEED_TO_CHECKOUT, {}, "Proceed to checkout")
                 return NextAction(SemanticAction.PROCEED_TO_CHECKOUT, {}, "Proceed to checkout")
@@ -215,6 +221,14 @@ class DecisionEngine:
                 return NextAction(SemanticAction.SELECT_PRODUCT, {"price_max": goal.price_max}, "Select product (post-search)")
             if goal.has_search_goal():
                 return NextAction(SemanticAction.SEARCH, {"query": goal.search_query}, "Search (page_type assist)")
+            
+            # Try exploratory navigation if we need to buy something but haven't started yet
+            if goal.complete_purchase and not state.product_selected:
+                # Look for common category/navigation links
+                return NextAction(SemanticAction.EXPLORATORY_CLICK, 
+                    {"candidates": ["Products", "Shop", "Buy", "Air Solutions", "TVs", "Appliances"]},
+                    "Navigate from home to find products")
+            
             return NextAction(SemanticAction.ACCEPT_COOKIES, {}, "Try accept cookies")
 
         if pt == PageType.SEARCH_RESULTS:
@@ -262,7 +276,7 @@ class DecisionEngine:
     ) -> NextAction:
         """
         RULE 3: When no rule matches, force minimal exploratory action.
-        Never idle. Try: close modal, accept cookies, search, click primary button.
+        Never idle. Try: close modal, accept cookies, navigate, search, click primary button.
         """
         # 1. Close modal / accept cookies
         if _button_matches(world.visible_buttons, "Accept", "Accept all", "Close", "OK", "Agree", "Dismiss"):
@@ -270,17 +284,50 @@ class DecisionEngine:
         if world.modals:
             return NextAction(SemanticAction.CLOSE_MODAL, {}, "Recovery: close modal")
 
-        # 2. Force search if goal has it and we haven't searched
+        # 2. If on home page and need to buy something, try navigating to product categories
+        # Be smart: look at visible buttons to guess what categories are available
+        if world.page_type == PageType.HOME and goal.complete_purchase and not state.product_selected:
+            # Extract category keywords from visible buttons/links
+            visible_categories = []
+            for btn_text in (world.visible_buttons or [])[:30]:
+                # Look for product category keywords in button text
+                category_keywords = ["Air", "TV", "Television", "Appliance", "Refrigerator", 
+                                    "Washer", "Dryer", "Microwave", "Monitor", "Product",
+                                    "Shop", "Buy", "Split", "Window", "AC", "Conditioner"]
+                for kw in category_keywords:
+                    if kw.lower() in btn_text.lower():
+                        visible_categories.append(btn_text)
+                        break
+            
+            # Use visible categories if found, otherwise use common LG categories
+            if visible_categories:
+                return NextAction(
+                    SemanticAction.NAVIGATE_MENU,
+                    {"candidates": visible_categories[:10]},
+                    f"Recovery: navigate to detected categories: {visible_categories[:3]}"
+                )
+            else:
+                return NextAction(
+                    SemanticAction.NAVIGATE_MENU,
+                    {"candidates": ["Air Solutions", "Split AC", "Air Conditioners", "TVs", 
+                                   "Televisions", "Appliances", "Products", "Shop", "Buy"]},
+                    "Recovery: navigate from home to products"
+                )
+
+        # 3. Force search if goal has it and we haven't searched
         if goal.has_search_goal() and not state.has_searched():
             return NextAction(SemanticAction.SEARCH, {"query": goal.search_query}, "Recovery: force search")
 
-        # 3. Try search icon / search (may open search bar)
+        # 4. Try search icon / search (may open search bar)
         if _button_matches(world.visible_buttons, "Search", "search"):
             return NextAction(SemanticAction.SEARCH, {"query": goal.search_query or ""}, "Recovery: click search icon")
 
-        # 4. Try checkout/proceed first; guest only after we're on checkout page
-        if goal.complete_purchase and not state.checkout_started and _button_matches(world.visible_buttons, "Checkout", "Proceed", "Place order"):
-            return NextAction(SemanticAction.PROCEED_TO_CHECKOUT, {}, "Recovery: click checkout")
+        # 5. Try checkout/proceed first; guest only after we're on checkout page
+        # But DON'T try checkout if we're on home page without products
+        on_home_no_products = world.page_type == PageType.HOME and (not world.cart or not world.cart.count)
+        if goal.complete_purchase and not state.checkout_started and not on_home_no_products:
+            if _button_matches(world.visible_buttons, "Checkout", "Proceed", "Place order"):
+                return NextAction(SemanticAction.PROCEED_TO_CHECKOUT, {}, "Recovery: click checkout")
         in_checkout_context = (
             state.checkout_started
             or world.page_type in (PageType.CHECKOUT, PageType.GUEST_CHECKOUT)
