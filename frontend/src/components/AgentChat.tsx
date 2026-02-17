@@ -43,6 +43,23 @@ interface UiAutomationPayload {
   plan?: any;
   script?: string;
   healingHistory?: any;
+  // NEW: Enhanced System V2 fields
+  isV2?: boolean;
+  passed?: boolean;
+  total_steps?: number;
+  executed_steps?: number;
+  failed_step?: number | null;
+  duration_ms?: number;
+  checkpoints?: Array<{
+    step_id: number;
+    description: string;
+    state: string;
+    timestamp: string;
+    success: boolean;
+    error: string | null;
+  }>;
+  assertion_count?: number;
+  action_count?: number;
 }
 
 type MessagePayload = SyntheticPayload | UiAutomationPayload | null;
@@ -243,49 +260,53 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
           };
           setMessages(prev => [...prev, agentMsg]);
         } else {
-          const res = await fetch(`${apiBase}/ui/run`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              raw_input: combinedText,
-              use_synthetic_data: useSyntheticData,
-              synthetic_run_id: undefined,
-              script_language: scriptLanguage,
-              chat_id: chatId ?? undefined,
-              visible_browser: visibleBrowser
-            })
-          });
+          // UI Automation: Use Enhanced Deterministic System V2
+          const res = await fetch(`${apiBase}/ui-automation-v2/run`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                natural_language: combinedText,
+                visible_browser: visibleBrowser,
+                chat_id: chatId ?? undefined
+              })
+            });
 
-          if (!res.ok) {
-            const msg =
-              res.status === 404
-                ? "UI automation endpoint not found (404). Check backend is running."
-                : `UI automation agent error: ${res.status} ${res.statusText}`;
-            throw new Error(msg);
-          }
-
-          const data = await res.json();
-          if (data.chat_id != null) setChatId(data.chat_id);
-
-          const agentMsg: ChatMessage = {
-            id: `a-${Date.now()}`,
-            sender: "agent",
-            text: `UI automation ${data.status} for execution ${data.execution_id}.`,
-            createdAt: new Date().toISOString(),
-            payload: {
-              kind: "ui",
-              status: data.status,
-              testCaseId: data.test_case_id,
-              executionId: data.execution_id,
-              plan: data.plan ?? data.validation ?? null,
-              script: data.script ?? null,
-              healingHistory: {
-                healed: data.healed,
-                screenshot: data.screenshot
-              }
+            if (!res.ok) {
+              const msg =
+                res.status === 404
+                  ? "Enhanced System V2 endpoint not found (404). Make sure backend is updated with ui_automation_v2 router."
+                  : `Enhanced System V2 error: ${res.status} ${res.statusText}`;
+              throw new Error(msg);
             }
-          };
-          setMessages(prev => [...prev, agentMsg]);
+
+            const data = await res.json();
+            if (data.chat_id != null) setChatId(data.chat_id);
+
+            const agentMsg: ChatMessage = {
+              id: `a-${Date.now()}`,
+              sender: "agent",
+              text: data.passed
+                ? `✅ Test PASSED - ${data.executed_steps}/${data.total_steps} steps (${(data.duration_ms / 1000).toFixed(1)}s)`
+                : `❌ Test FAILED at step ${data.failed_step} - ${data.error}`,
+              createdAt: new Date().toISOString(),
+              payload: {
+                kind: "ui",
+                status: data.passed ? "passed" : "failed",
+                isV2: true,
+                passed: data.passed,
+                total_steps: data.total_steps,
+                executed_steps: data.executed_steps,
+                failed_step: data.failed_step,
+                duration_ms: data.duration_ms,
+                checkpoints: data.checkpoints ?? [],
+                assertion_count: data.assertion_count,
+                action_count: data.action_count,
+                plan: data.plan ?? null,
+                script: data.script ?? null,
+                healingHistory: null
+              }
+            };
+            setMessages(prev => [...prev, agentMsg]);
         }
         fetchChats();
       } catch (err) {
@@ -303,7 +324,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
         setIsSending(false);
       }
     },
-    [agentType, scriptLanguage, useSyntheticData, chatId, apiBase, fetchChats]
+    [agentType, scriptLanguage, useSyntheticData, visibleBrowser, chatId, apiBase, fetchChats]
   );
 
   return (

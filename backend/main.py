@@ -5,10 +5,15 @@ Single backend service running on port 8000
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from routers import synthetic_data, ui_automation, api_automation, chats, run_status
+from routers.ui_automation_v2 import router_v2 as ui_automation_v2
 import logging
 import sys
 import os
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Fix for Windows: Use ProactorEventLoop for Playwright subprocess support
 if sys.platform == "win32":
@@ -84,6 +89,7 @@ app.add_middleware(
 # Include routers
 app.include_router(synthetic_data.router, prefix="/synthetic", tags=["Synthetic Data"])
 app.include_router(ui_automation.router, prefix="/ui", tags=["UI Automation"])
+app.include_router(ui_automation_v2, tags=["UI Automation V2"])  # NEW: Enhanced Deterministic System V2
 app.include_router(api_automation.router, prefix="/api", tags=["API Automation"])
 app.include_router(chats.router, prefix="/chats", tags=["Chats"])
 app.include_router(run_status.router, prefix="/run-status", tags=["Run Status"])
@@ -104,12 +110,30 @@ async def root():
     logger.info("Root endpoint accessed")
     return {
         "message": "Enterprise Test Automation Platform API",
+        "version": "2.0",
         "endpoints": {
             "synthetic": "/synthetic/*",
             "ui_automation": "/ui/*",
+            "ui_automation_v2": "/ui-automation-v2/* (NEW: Enhanced Deterministic System)",
             "api_automation": "/api/*",
             "chats": "/chats/*",
             "run_status": "/run-status/*"
+        },
+        "new_features": {
+            "ui_automation_v2": {
+                "description": "Enhanced Deterministic System V2",
+                "features": [
+                    "Semantic parsing (English → JSON DSL)",
+                    "Assertions never click (only inspect)",
+                    "Deterministic execution (no randomness)",
+                    "State validation (before/after each step)",
+                    "Smart waits (network idle, state changes)"
+                ],
+                "endpoints": [
+                    "POST /ui-automation-v2/run - Execute test",
+                    "GET /ui-automation-v2/health - Health check"
+                ]
+            }
         }
     }
 

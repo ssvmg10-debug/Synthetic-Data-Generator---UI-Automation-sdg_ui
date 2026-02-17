@@ -1355,3 +1355,195 @@ async def get_enterprise_v3_metrics(execution_id: int, db: Session = Depends(get
             "Deadlock Prevention"
         ]
     }
+
+
+# ========== INTENT-BASED AUTOMATION (NEW V2.0) ==========
+
+class IntentBasedRequest(BaseModel):
+    """Request model for intent-based automation"""
+    test_case: str
+    url: str
+    chat_id: Optional[int] = None
+    visible_browser: Optional[bool] = True
+
+
+@router.post("/intent-based/run")
+async def run_intent_based_automation(
+    request: IntentBasedRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    🎯 INTENT-BASED AUTOMATION (v2.0)
+    
+    New production-grade architecture with:
+    - Semantic intent planning
+    - Specialized flow executors
+    - State validation
+    - CTA classification
+    - Fuzzy product matching
+    - Controlled resolver (5s max)
+    
+    Example:
+        POST /ui/intent-based/run
+        {
+            "test_case": "Search for lg tv, select LG AC, add to cart, enter pincode 500032",
+            "url": "https://www.lg.com/in",
+            "visible_browser": true
+        }
+    """
+    chat_id = None
+    test_case_id = None
+    
+    try:
+        logger.info("="*80)
+        logger.info("🎯 INTENT-BASED AUTOMATION REQUEST (v2.0)")
+        logger.info("="*80)
+        logger.info(f"Test Case: {request.test_case}")
+        logger.info(f"URL: {request.url}")
+        logger.info("="*80)
+        
+        # Create chat if needed
+        chat_id = ensure_chat_and_append_user_message(
+            db, request.chat_id, "ui-automation-intent", request.test_case
+        )
+        
+        # Save test case
+        test_case = UITestCase(
+            raw_input=request.test_case,
+            structured_json={"type": "intent-based", "url": request.url}
+        )
+        db.add(test_case)
+        db.commit()
+        db.refresh(test_case)
+        test_case_id = test_case.id
+        
+        _set_current_run(test_case_id, stage="intent_planning")
+        append_agent_message(
+            db, chat_id,
+            f"UI: Starting intent-based automation for test case {test_case_id}",
+            {"stage": "start", "architecture": "intent-based-v2"}
+        )
+        
+        # Run intent-based automation in background
+        async def execute_intent_based():
+            from playwright.async_api import async_playwright
+            from services.ui_automation.core import execute_test_case_with_intents
+            
+            try:
+                _update_current_run_stage("executing")
+                
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(
+                        headless=not request.visible_browser
+                    )
+                    page = await browser.new_page()
+                    
+                    try:
+                        # Execute with intent system
+                        result = await execute_test_case_with_intents(
+                            page=page,
+                            test_case=request.test_case,
+                            url=request.url
+                        )
+                        
+                        # Save execution run
+                        execution_run = UIExecutionRun(
+                            test_case_id=test_case_id,
+                            status="passed" if result['success'] else "failed",
+                            logs_path=None,
+                            screenshot_path=None
+                        )
+                        db.add(execution_run)
+                        db.commit()
+                        db.refresh(execution_run)
+                        
+                        # Record metrics
+                        record_run(
+                            success=result['success'],
+                            steps_executed=result['executed_intents'],
+                            steps_healed=result['phase_stats']['retry'],
+                            steps_failed=result['failure_count']
+                        )
+                        
+                        logger.info("="*80)
+                        if result['success']:
+                            logger.info("✅ INTENT-BASED AUTOMATION SUCCEEDED")
+                        else:
+                            logger.info("❌ INTENT-BASED AUTOMATION FAILED")
+                        logger.info(f"Success: {result['success_count']}/{result['total_intents']}")
+                        logger.info(f"Time: {result['total_time']:.2f}s")
+                        logger.info(f"Avg/Intent: {result['avg_time_per_intent']:.2f}s")
+                        logger.info("="*80)
+                        
+                        # Append result to chat
+                        append_agent_message(
+                            db, chat_id,
+                            f"UI: Intent-based automation {'succeeded' if result['success'] else 'failed'}. "
+                            f"{result['success_count']}/{result['total_intents']} intents succeeded in {result['total_time']:.2f}s",
+                            {
+                                "stage": "complete",
+                                "architecture": "intent-based-v2",
+                                "executionId": execution_run.id,
+                                "result": result
+                            }
+                        )
+                        
+                    finally:
+                        await browser.close()
+                
+                _clear_current_run()
+                
+            except Exception as e:
+                logger.error(f"❌ Intent-based execution error: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                
+                # Save failed run
+                execution_run = UIExecutionRun(
+                    test_case_id=test_case_id,
+                    status="failed",
+                    logs_path=None,
+                    screenshot_path=None
+                )
+                db.add(execution_run)
+                db.commit()
+                
+                append_agent_message(
+                    db, chat_id,
+                    f"UI: Intent-based automation failed - {str(e)}",
+                    {"stage": "error", "error": str(e)}
+                )
+                
+                _clear_current_run()
+        
+        # Execute in background
+        background_tasks.add_task(execute_intent_based)
+        
+        return {
+            "success": True,
+            "test_case_id": test_case_id,
+            "chat_id": chat_id,
+            "status": "running",
+            "architecture": "intent-based-v2",
+            "message": "Intent-based automation started in background"
+        }
+        
+    except HTTPException:
+        _clear_current_run()
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error starting intent-based automation: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        if chat_id:
+            try:
+                append_agent_message(
+                    db, chat_id,
+                    f"Error: {str(e)}",
+                    {"stage": "error", "error": str(e)}
+                )
+            except:
+                pass
+        _clear_current_run()
+        raise HTTPException(status_code=500, detail=str(e))

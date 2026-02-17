@@ -8,6 +8,23 @@ interface UiAutomationPayload {
   plan?: any;
   script?: string | null;
   healingHistory?: any;
+  // NEW: Enhanced System V2 fields
+  isV2?: boolean;
+  passed?: boolean;
+  total_steps?: number;
+  executed_steps?: number;
+  failed_step?: number | null;
+  duration_ms?: number;
+  checkpoints?: Array<{
+    step_id: number;
+    description: string;
+    state: string;
+    timestamp: string;
+    success: boolean;
+    error: string | null;
+  }>;
+  assertion_count?: number;
+  action_count?: number;
 }
 
 interface Props {
@@ -15,7 +32,7 @@ interface Props {
 }
 
 export const UiAutomationResponseCard: React.FC<Props> = ({ payload }) => {
-  const { status, testCaseId, executionId, plan, script, healingHistory } = payload;
+  const { status, testCaseId, executionId, plan, script, healingHistory, isV2, checkpoints } = payload;
 
   const steps = plan?.steps ?? [];
 
@@ -23,9 +40,14 @@ export const UiAutomationResponseCard: React.FC<Props> = ({ payload }) => {
     <div className="card">
       <div className="card-header">
         <div>
-          <div className="card-title">UI automation result</div>
+          <div className="card-title">
+            {isV2 ? "Enhanced System V2 Result" : "UI automation result"}
+          </div>
           <div className="card-subtitle">
             Status: <span className={`status-pill status-${status}`}>{status}</span>
+            {isV2 && payload.duration_ms && (
+              <> · Duration: {(payload.duration_ms / 1000).toFixed(1)}s</>
+            )}
           </div>
         </div>
         <div className="card-meta">
@@ -35,23 +57,56 @@ export const UiAutomationResponseCard: React.FC<Props> = ({ payload }) => {
           {typeof executionId === "number" && (
             <span className="meta-item">Execution #{executionId}</span>
           )}
+          {isV2 && payload.assertion_count !== undefined && (
+            <span className="meta-item">Assertions: {payload.assertion_count}</span>
+          )}
+          {isV2 && payload.action_count !== undefined && (
+            <span className="meta-item">Actions: {payload.action_count}</span>
+          )}
         </div>
       </div>
 
-      {steps.length > 0 && (
+      {isV2 && checkpoints && checkpoints.length > 0 && (
         <section className="card-section">
-          <h4 className="section-title">Planner test plan</h4>
+          <h4 className="section-title">Execution Checkpoints</h4>
           <ol className="steps-list">
-            {steps.map((step: any) => (
-              <li key={step.step ?? step.description}>
+            {checkpoints.map((cp) => (
+              <li key={cp.step_id}>
                 <div className="step-line">
-                  <span className="step-index">{step.step}</span>
-                  <span className="step-action">{step.action}</span>
-                  <span className="step-description">{step.description}</span>
+                  <span className={`step-index ${cp.success ? 'success' : 'error'}`}>
+                    {cp.success ? '✅' : '❌'} Step {cp.step_id}
+                  </span>
+                  <span className="step-description">{cp.description}</span>
+                  <span className="step-action">State: {cp.state}</span>
+                  {cp.error && <div className="error-text">{cp.error}</div>}
                 </div>
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {steps.length > 0 && (
+        <section className="card-section">
+          <h4 className="section-title">{isV2 ? "Test Plan" : "Planner test plan"}</h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
+                <th style={{ padding: '8px', width: '60px' }}>#</th>
+                <th style={{ padding: '8px', width: '120px' }}>Action</th>
+                <th style={{ padding: '8px' }}>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {steps.map((step: any, idx: number) => (
+                <tr key={step.step ?? idx} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '8px' }}>{step.step ?? idx + 1}</td>
+                  <td style={{ padding: '8px', textTransform: 'lowercase' }}>{step.intent || step.type || step.action}</td>
+                  <td style={{ padding: '8px' }}>{step.description || step.target || step.value || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

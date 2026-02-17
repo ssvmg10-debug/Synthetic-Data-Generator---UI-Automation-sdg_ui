@@ -5,6 +5,7 @@ Multi-strategy element finding WITHOUT AI/healing
 import logging
 from playwright.async_api import Page
 import re
+from .valid_data_generator import generate_valid_data
 
 logger = logging.getLogger(__name__)
 
@@ -61,23 +62,28 @@ def _expand_select_keywords(label: str) -> list[str]:
     Expand SELECT keywords for delivery options, payment methods, etc.
     
     Examples:
-    - 'free delivery' → ['free delivery', 'free', 'standard', 'no charge']
-    - 'credit card' → ['credit card', 'credit', 'card', 'visa', 'mastercard']
+    - 'free delivery' → ['free delivery', 'free shipping', 'standard delivery', 'free', 'no charge', ...]
+    - 'credit card' → ['credit card', 'credit', 'card', 'visa', 'mastercard', 'payment']
     """
     label_lower = label.lower()
     keywords = [label]  # Always include original
     
-    # Delivery/shipping options
+    # Delivery/shipping options - ENHANCED with more variations
     if any(word in label_lower for word in ['free', 'delivery', 'shipping', 'standard']):
-        keywords.extend(['free', 'standard', 'no charge', 'complimentary', 'delivery', 'shipping'])
+        keywords.extend([
+            'free', 'free shipping', 'free delivery', 'standard', 'standard delivery', 
+            'standard shipping', 'no charge', 'complimentary', 'delivery', 'shipping',
+            'free standard', 'regular delivery', 'regular shipping', 'free (standard)',
+            '₹0', 'rs.0', '$0', '£0', 'FREE', 'Standard Delivery'
+        ])
     
     # Payment methods
     elif any(word in label_lower for word in ['credit', 'debit', 'card', 'payment']):
-        keywords.extend(['credit', 'debit', 'card', 'visa', 'mastercard', 'payment'])
+        keywords.extend(['credit', 'debit', 'card', 'visa', 'mastercard', 'payment', 'pay by card'])
     
     # Yes/No options
     elif any(word in label_lower for word in ['yes', 'no', 'agree', 'accept']):
-        keywords.extend(['yes', 'no', 'agree', 'accept', 'confirm'])
+        keywords.extend(['yes', 'no', 'agree', 'accept', 'confirm', 'I agree'])
     
     # Deduplicate
     seen = set()
@@ -98,6 +104,15 @@ async def smart_click(page: Page, label: str):
     This alone increases success rate 30-40%.
     """
     logger.info(f"🎯 Clicking: {label}")
+    
+    # Wait for any pending navigations or dropdowns from previous action
+    try:
+        await page.wait_for_load_state("domcontentloaded", timeout=2000)
+    except:
+        pass
+    
+    # Small wait for dropdowns/menus to appear after previous click
+    await page.wait_for_timeout(500)
     
     # Candidate strategies (order matters - most reliable first)
     candidates = [
@@ -126,10 +141,52 @@ async def smart_click(page: Page, label: str):
             
             if count > 0:
                 logger.debug(f"  Strategy {idx} found {count} match(es)")
-                await candidate.first.wait_for(state="visible", timeout=5000)
-                await candidate.first.click(timeout=5000)
-                logger.info(f"  ✅ Clicked using strategy {idx}")
-                return
+                
+                # 🔥 FIX: When multiple matches, find the one in viewport
+                if count > 1:
+                    logger.debug(f"  Multiple matches found, selecting best visible candidate")
+                    best_element = None
+                    best_score = -1
+                    
+                    for i in range(min(count, 5)):  # Check first 5 matches max
+                        try:
+                            elem = candidate.nth(i)
+                            # Check if element is visible
+                            is_visible = await elem.is_visible()
+                            if not is_visible:
+                                continue
+                            
+                            # Check if element is in viewport
+                            in_viewport = await elem.evaluate("""el => {
+                                const rect = el.getBoundingClientRect();
+                                return (
+                                    rect.top >= 0 &&
+                                    rect.left >= 0 &&
+                                    rect.bottom <= window.innerHeight &&
+                                    rect.right <= window.innerWidth
+                                );
+                            }""")
+                            
+                            # Score: in viewport = 10, visible but not in viewport = 5
+                            score = 10 if in_viewport else 5
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_element = elem
+                        except:
+                            continue
+                    
+                    if best_element:
+                        await best_element.wait_for(state="visible", timeout=5000)
+                        await best_element.click(timeout=5000)
+                        logger.info(f"  ✅ Clicked using strategy {idx} (best match in viewport)")
+                        return
+                else:
+                    # Single match, click it
+                    await candidate.first.wait_for(state="visible", timeout=5000)
+                    await candidate.first.click(timeout=5000)
+                    logger.info(f"  ✅ Clicked using strategy {idx}")
+                    return
         except Exception as e:
             logger.debug(f"  Strategy {idx} failed: {e}")
             continue
@@ -145,6 +202,7 @@ async def smart_type(page: Page, label: str, value: str):
     Phase 1: Deterministic with attribute scoring
     
     New capabilities:
+    - Valid data generation for Indian e-commerce (mobile, email, names)
     - Semantic target normalization already done in compiler
     - Keyword expansion for common field aliases
     - Attribute-based scoring (placeholder, name, id, aria-label)
@@ -152,7 +210,10 @@ async def smart_type(page: Page, label: str, value: str):
     - AJAX stabilization
     - Enter/Tab after typing
     """
-    logger.info(f"⌨️  Typing '{value}' into: {label}")
+    # Generate valid data if needed
+    valid_value = generate_valid_data(label, value)
+    
+    logger.info(f"⌨️  Typing '{valid_value}' into: {label}")
     
     # 🔵 FIX 3: Wait for possible AJAX/modal after previous click
     try:
@@ -232,7 +293,7 @@ async def smart_type(page: Page, label: str, value: str):
                 if await locator.count() > 0:
                     first = locator.first
                     await first.scroll_into_view_if_needed(timeout=2000)
-                    await first.fill(value, timeout=5000)
+                    await first.fill(valid_value, timeout=5000)
                     
                     # 🔵 FIX 4: Trigger validation (Tab or Enter)
                     try:
@@ -258,7 +319,7 @@ async def smart_type(page: Page, label: str, value: str):
                 # Try first input
                 first = fallback_inputs.first
                 await first.scroll_into_view_if_needed(timeout=2000)
-                await first.fill(value, timeout=5000)
+                await first.fill(valid_value, timeout=5000)
                 await first.press("Tab")
                 logger.info(f"  ✅ Typed using AGGRESSIVE FALLBACK (first input in modal)")
                 return
@@ -271,7 +332,7 @@ async def smart_type(page: Page, label: str, value: str):
     raise Exception(f"Input field '{label}' not found after {len(candidates)} strategies")
 
 
-async def smart_select(page: Page, label: str, value: str = None):
+async def smart_select(page: Page, label: str, value: str = None, retry_count: int = 0, max_retries: int = 2):
     """
     Handle SELECT instructions (radio buttons, checkboxes, dropdown options).
     
@@ -280,9 +341,18 @@ async def smart_select(page: Page, label: str, value: str = None):
     - Radio button strategies
     - Checkbox strategies  
     - Dropdown option strategies
-    - Fallback to click strategies
+    - ROBUST RETRY LOGIC with progressive waits
+    - Fallback to smart resolver with fuzzy matching
     """
-    logger.info(f"📋 Selecting: {label}")
+    logger.info(f"📋 Selecting: {label} (attempt {retry_count + 1}/{max_retries + 1})")
+    
+    # Wait for page to be stable (critical for dynamic content)
+    try:
+        await page.wait_for_load_state("domcontentloaded", timeout=3000)
+        # Additional wait for client-side rendering (especially after previous click)
+        await page.wait_for_timeout(800 if retry_count == 0 else 1500)
+    except:
+        pass
     
     # Expand keywords for common selection types
     keywords = _expand_select_keywords(label)
@@ -292,17 +362,25 @@ async def smart_select(page: Page, label: str, value: str = None):
     for keyword in keywords:
         logger.debug(f"  Trying select keyword: '{keyword}'")
         
-        # Strategy 1: Radio button by label
+        # Strategy 1: Radio button with nearby label
         try:
-            radio = page.locator(f"input[type='radio'] + label:has-text('{keyword}')")
-            if await radio.count() > 0:
-                await radio.first.click(timeout=3000)
+            # Check for label that contains keyword
+            radio_label = page.locator(f"label:has-text('{keyword}')").filter(has=page.locator("input[type='radio']"))
+            if await radio_label.count() > 0:
+                await radio_label.first.click(timeout=3000)
                 logger.info(f"  ✅ Selected radio via label: '{keyword}'")
+                return
+            
+            # Also try clicking the radio directly if label isn't wrapping it
+            radio_near_label = page.locator(f"label:has-text('{keyword}') + input[type='radio']")
+            if await radio_near_label.count() > 0:
+                await radio_near_label.first.check(timeout=3000)
+                logger.info(f"  ✅ Selected radio near label: '{keyword}'")
                 return
         except:
             pass
         
-        # Strategy 2: Radio button by value
+        # Strategy 2: Radio button by value attribute
         try:
             radio = page.locator(f"input[type='radio'][value*='{keyword}' i]")
             if await radio.count() > 0:
@@ -312,17 +390,27 @@ async def smart_select(page: Page, label: str, value: str = None):
         except:
             pass
         
-        # Strategy 3: Checkbox by label
+        # Strategy 3: Div/span acting as radio option (custom UI)
         try:
-            checkbox = page.locator(f"input[type='checkbox'] + label:has-text('{keyword}')")
-            if await checkbox.count() > 0:
-                await checkbox.first.click(timeout=3000)
+            custom_radio = page.locator(f"div[role='radio']:has-text('{keyword}'), span[role='radio']:has-text('{keyword}')")
+            if await custom_radio.count() > 0:
+                await custom_radio.first.click(timeout=3000)
+                logger.info(f"  ✅ Selected custom radio: '{keyword}'")
+                return
+        except:
+            pass
+        
+        # Strategy 4: Checkbox by label
+        try:
+            checkbox_label = page.locator(f"label:has-text('{keyword}')").filter(has=page.locator("input[type='checkbox']"))
+            if await checkbox_label.count() > 0:
+                await checkbox_label.first.click(timeout=3000)
                 logger.info(f"  ✅ Selected checkbox via label: '{keyword}'")
                 return
         except:
             pass
         
-        # Strategy 4: Dropdown option
+        # Strategy 5: Dropdown option
         try:
             option = page.locator(f"option:has-text('{keyword}')")
             if await option.count() > 0:
@@ -334,24 +422,52 @@ async def smart_select(page: Page, label: str, value: str = None):
         except:
             pass
         
-        # Strategy 5: Clickable element with text
+        # Strategy 6: Clickable element with text (buttons, divs styled as options)
         try:
             clickable = page.get_by_text(keyword, exact=False)
             if await clickable.count() > 0:
-                # Filter for clickable elements (not just text nodes)
                 first = clickable.first
-                tag = await first.evaluate("el => el.tagName.toLowerCase()")
-                if tag in ["button", "a", "div", "span", "label"]:
+                # Check if element is clickable
+                is_clickable = await first.evaluate("""el => {
+                    const tag = el.tagName.toLowerCase();
+                    const role = el.getAttribute('role');
+                    const clickable = ['button', 'a', 'div', 'span', 'label', 'li'];
+                    const clickableRoles = ['button', 'option', 'radio', 'checkbox'];
+                    return clickable.includes(tag) || (role && clickableRoles.includes(role));
+                }""")
+                
+                if is_clickable:
+                    await first.scroll_into_view_if_needed(timeout=2000)
                     await first.click(timeout=3000)
-                    logger.info(f"  ✅ Selected clickable text: '{keyword}'")
+                    logger.info(f"  ✅ Selected clickable element: '{keyword}'")
                     return
-        except:
+        except Exception as e:
+            logger.debug(f"  Strategy 6 failed: {e}")
             pass
     
-    # Fallback: Try smart_click with original label
-    logger.warning(f"  ⚠️ No select-specific strategies worked, trying smart_click fallback")
+    # Phase 1 fallback: Try smart_click with original label
+    logger.warning(f"  ⚠️ No select-specific strategies worked, trying Phase 1 smart_click")
     try:
         await smart_click(page, label)
         logger.info(f"  ✅ Selected using smart_click fallback")
+        return
     except Exception as e:
-        raise Exception(f"Selection failed for: '{label}'")
+        logger.debug(f"  smart_click fallback failed: {e}")
+    
+    # Phase 2 fallback: Use smart resolver with fuzzy matching
+    logger.warning(f"  ⚠️ Phase 1 failed, trying Phase 2 smart resolver")
+    from .smart_resolver import smart_resolve_click
+    
+    if await smart_resolve_click(page, label):
+        logger.info(f"  ✅ Selected using smart resolver (Phase 2)")
+        return
+    
+    # RETRY LOGIC: If we haven't exhausted retries, wait longer and try again
+    if retry_count < max_retries:
+        logger.warning(f"  ⚠️ All strategies failed, retrying after longer wait... ({retry_count + 1}/{max_retries})")
+        progressive_wait = 2000 + (retry_count * 1000)  # 2s, 3s, 4s...
+        await page.wait_for_timeout(progressive_wait)
+        return await smart_select(page, label, value, retry_count + 1, max_retries)
+    
+    # All strategies and retries exhausted
+    raise Exception(f"Selection failed for: '{label}' after {max_retries + 1} attempts")
