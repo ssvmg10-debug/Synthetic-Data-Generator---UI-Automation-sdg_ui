@@ -1,0 +1,22 @@
+{
+  "selectors": {
+    "9f10aed9ba7dde97": "#desktop-gnb_1depth_1",
+    "ae37ac4a1f5d11a6": "#desktop-gnb_1depth_1"
+  },
+  "state_transitions": [],
+  "stable_paths": [],
+  "selectors_v2": {
+    "v2_30404092203752b3": {
+      "selector": "button.buy",
+      "dom_path": null,
+      "bounding_box": null,
+      "container_info": {}
+    },
+    "v2_4a2bee5171969432": {
+      "selector": null,
+      "dom_path": null,
+      "bounding_box": null,
+      "container_info": {}
+    }
+  }
+}

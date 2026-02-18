@@ -55,3 +55,6 @@ python-Levenshtein==0.25.0
 
 # Additional utilities
 aiohttp==3.9.3
+
+# Mem0 — persistent memory for LLM/healing agent (use env MEM0_API_KEY)
+mem0ai>=0.1.0

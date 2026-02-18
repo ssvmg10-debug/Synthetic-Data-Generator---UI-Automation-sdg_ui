@@ -1,0 +1,48 @@
+{
+  "site": "lg.com",
+  "description": "LG India e-commerce flow handlers - popups, modals, delivery selection",
+  "handlers": [
+    {
+      "trigger": "after_pincode_check",
+      "description": "After pincode check, LG shows 'Select delivery option' popup - dismiss it before selecting delivery",
+      "actions": [
+        {
+          "type": "dismiss_modal",
+          "button_texts": ["OK", "Continue", "Select delivery", "Select delivery option"]
+        },
+        {
+          "type": "wait",
+          "ms": 800
+        }
+      ]
+    },
+    {
+      "trigger": "before_select_delivery",
+      "description": "Before selecting free delivery, ensure delivery options are visible and no modal blocks",
+      "actions": [
+        {
+          "type": "dismiss_modal",
+          "button_texts": ["OK", "Continue", "Select delivery"]
+        },
+        {
+          "type": "wait",
+          "ms": 1000
+        }
+      ]
+    },
+    {
+      "trigger": "before_checkout",
+      "description": "Before checkout, dismiss any blocking modals",
+      "actions": [
+        {
+          "type": "dismiss_modal",
+          "button_texts": ["OK", "Continue", "Close"]
+        },
+        {
+          "type": "wait",
+          "ms": 500
+        }
+      ]
+    }
+  ]
+}

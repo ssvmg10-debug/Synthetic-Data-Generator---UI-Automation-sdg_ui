@@ -43,13 +43,24 @@ class SemanticTestParser:
         for raw_step in raw_steps:
             # Check if this line contains a product description with multiple comma-separated features
             # Pattern: "click/select [product name], [feature1], [feature2], ..."
-            # Example: "this product LG 5 Star (1.0) Split AC, AI Convertible 6-in-1 Cooling, Auto Clean, Diet Mode+, 100% Copper Tubes, 3.5 kW, 2025 Model"
+            # Example: "then click on this product LG 5 Star (1.0) Split AC, AI Convertible 6-in-1 Cooling, Auto Clean, Diet Mode+, 100% Copper Tubes, 3.5 kW, 2025 Model"
             
-            # If line starts with action verb and has multiple commas, treat as single product selection
+            step_lower = raw_step.lower()
+            
+            # If line contains a click/select + "product" phrase and has multiple commas,
+            # treat the ENTIRE line as a SINGLE product selection instruction.
+            # This prevents splitting the long LG product name into separate pseudo-steps
+            # like "AI Convertible 6-in-1 Cooling", "3.5 kW", etc.
             is_product_line = False
-            action_match = re.match(r'^(click|select|choose|this product)\s+(.+)', raw_step, re.I)
-            if action_match and raw_step.count(',') >= 2:
-                # This looks like a product with comma-separated features
+            
+            # Case 1: Line starts directly with click/select/choose/this product
+            if re.match(r'^(click|select|choose|this product)\b', step_lower, re.I) and raw_step.count(',') >= 2:
+                is_product_line = True
+            # Case 2: Line contains "...click on this product ..." anywhere
+            elif "click on this product" in step_lower and raw_step.count(',') >= 2:
+                is_product_line = True
+            # Case 3: Line contains "...this product LG ..." style phrasing
+            elif "this product" in step_lower and any(brand in step_lower for brand in ["lg", "samsung"]) and raw_step.count(',') >= 2:
                 is_product_line = True
             
             if is_product_line:
@@ -62,9 +73,27 @@ class SemanticTestParser:
                 # Split by commas for regular steps (non-product descriptions)
                 sub_steps = [s.strip() for s in raw_step.split(',') if s.strip()]
                 for sub_step in sub_steps:
-                    parsed_step = SemanticTestParser._parse_single_step(sub_step, step_id)
+                    # Extract "wait for N seconds" (standalone or "after that wait for N seconds")
+                    wait_match = re.search(r'(?:after that\s+)?wait for (\d+)\s*seconds?', sub_step, re.I)
+                    main_text = sub_step
+                    wait_seconds = None
+                    if wait_match:
+                        wait_seconds = int(wait_match.group(1))
+                        main_text = re.sub(r'\s*after that\s+wait for \d+\s*seconds?\.?$', '', sub_step, flags=re.I).strip()
+                        if not main_text:
+                            main_text = None  # standalone "wait for N seconds" - let _parse_single_step handle it
+                    parsed_step = SemanticTestParser._parse_single_step(main_text, step_id) if main_text else None
                     if parsed_step:
                         steps.append(parsed_step)
+                        step_id += 1
+                    # Append trailing wait only when we stripped it from a compound step (main step was not a wait)
+                    if wait_seconds and (not parsed_step or parsed_step.type != StepType.WAIT):
+                        steps.append(TestStep(
+                            id=step_id,
+                            type=StepType.WAIT,
+                            intent=Intent.WAIT,
+                            metadata={"duration_ms": wait_seconds * 1000}
+                        ))
                         step_id += 1
         
         return TestCase(
@@ -134,6 +163,30 @@ class SemanticTestParser:
         )
     
     @staticmethod
+    def _extract_section_and_ordinal(target: str) -> tuple:
+        """C1/C3: Extract section/container hint and ordinal from target. Returns (clean_target, metadata_dict or None)."""
+        if not target or not isinstance(target, str):
+            return target, None
+        meta = {}
+        t = target.strip()
+        # " in product card" / " in checkout section" / " in the form"
+        in_section = re.search(r'\s+in\s+(?:the\s+)?(product\s+card|checkout\s+section|form|main\s+section|delivery\s+section|content\s+area)\s*$', t, re.I)
+        if in_section:
+            section = in_section.group(1).replace(" ", "_").lower()
+            meta["section"] = section
+            meta["container_hint"] = section
+            t = t[: in_section.start()].strip()
+        # "second product", "first delivery option", "2nd product", "1st option"
+        ord_match = re.search(r'\b(first|second|third|1st|2nd|3rd|fourth|4th|fifth|5th)\s+(product|delivery\s+option|option|item)\b', t, re.I)
+        if ord_match:
+            word = ord_match.group(1).lower()
+            ord_map = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5}
+            meta["ordinal"] = ord_map.get(word, 1)
+            meta["target_type"] = ord_match.group(2).replace(" ", "_").lower()
+            t = re.sub(r'\b(first|second|third|1st|2nd|3rd|fourth|4th|fifth|5th)\s+(product|delivery\s+option|option|item)\b', r"\2", t, flags=re.I).strip()
+        return t, (meta if meta else None)
+
+    @staticmethod
     def _parse_single_step(step_text: str, step_id: int) -> Optional[TestStep]:
         """Parse single step into normalized TestStep"""
         step_lower = step_text.lower().strip()
@@ -145,7 +198,7 @@ class SemanticTestParser:
             r'^\d+%\s+\w+',  # Percentages: 100% Copper
             r'^\d{4}\s+model$',  # Year model: 2025 Model
             r'^[\w\s]+\+$',  # Feature with +: Diet Mode+
-            r'^then\s+fill\s+',  # Partial instruction: then fill billing/shipping
+            r'^then\s+fill\s+(?:billing|shipping)\s*$',  # Incomplete: "then fill billing" without field details
         ]
         
         for pattern in product_spec_patterns:
@@ -153,33 +206,50 @@ class SemanticTestParser:
                 logger.debug(f"Filtered out product spec: '{step_text}'")
                 return None
         
+        # ==================== WAIT ====================
+        wait_match = re.search(r'wait for (\d+)\s*(?:seconds?|secs?)?', step_lower)
+        if wait_match and not ("click" in step_lower or "select" in step_lower):
+            secs = int(wait_match.group(1))
+            return TestStep(
+                id=step_id,
+                type=StepType.WAIT,
+                intent=Intent.WAIT,
+                metadata={"duration_ms": secs * 1000}
+            )
+        
         # ==================== NAVIGATION ====================
-        if step_lower.startswith(("navigate to", "go to", "open", "visit")):
-            # Extract URL from text - look for http/https URLs first
+        # Only treat as GOTO when it's clearly a URL or "navigate/visit/go to [url or app]"
+        nav_starts = step_lower.startswith(("navigate to", "go to", "visit"))
+        if nav_starts or step_lower.startswith(("open ", "visit ")):
             url_match = re.search(r'https?://[^\s,]+', step_text)
             if url_match:
                 url = url_match.group().strip()
-            else:
-                # Fallback: remove navigation keywords and clean up
-                url = re.sub(r'^(navigate to|go to|open|visit)\s+(this\s+)?(application|app|site|website|page)?\s*', '', step_text, flags=re.I).strip()
-                # Remove trailing punctuation
-                url = url.rstrip('.,;:')
-                # Add https if no protocol
-                if url and not url.startswith(('http://', 'https://')):
-                    url = f'https://{url}'
-            
-            return TestStep(
-                id=step_id,
-                type=StepType.NAVIGATION,
-                intent=Intent.GOTO,
-                target=url,
-                expected_state=PageState.HOME
-            )
+                return TestStep(
+                    id=step_id,
+                    type=StepType.NAVIGATION,
+                    intent=Intent.GOTO,
+                    target=url,
+                    expected_state=PageState.HOME
+                )
+            if nav_starts or re.match(r'^(open|visit)\s+(this\s+)?(application|app|site|website|page)\s', step_lower):
+                url = re.sub(r'^(navigate to|go to|open|visit)\s+(this\s+)?(application|app|site|website|page)?\s*', '', step_text, flags=re.I).strip().rstrip('.,;:')
+                # Only GOTO when it looks like a URL/domain (has a dot or is already http) — else "go to cart" stays as CLICK
+                if url and (url.startswith(('http://', 'https://')) or '.' in url.split()[0]):
+                    if not url.startswith(('http://', 'https://')):
+                        url = f'https://{url}'
+                    return TestStep(id=step_id, type=StepType.NAVIGATION, intent=Intent.GOTO, target=url, expected_state=PageState.HOME)
+            # "go to cart", "open menu", "open settings" → CLICK (handled below)
         
         # ==================== ASSERTIONS (NOT ACTIONS!) ====================
         
-        # "Verify", "Check", "Ensure", "Validate" → ASSERTION
-        if any(keyword in step_lower for keyword in ["verify", "check", "ensure", "validate", "confirm"]):
+        # "Verify", "Check that", "Ensure" → ASSERTION (exclude "click on check" which is a button)
+        step_clean = re.sub(r'^(then|and)\s+', '', step_lower).strip()
+        is_verification = (
+            step_clean.startswith(("verify", "check that", "ensure", "validate", "confirm"))
+            or re.match(r"^(verify|validate|ensure)\s+", step_clean)
+        )
+        is_click_action = "click" in step_lower and ("check" in step_lower or "button" in step_lower)
+        if is_verification and not is_click_action:
             return SemanticTestParser._parse_assertion(step_text, step_id)
         
         # ==================== ACTIONS ====================
@@ -188,6 +258,21 @@ class SemanticTestParser:
         if "click" in step_lower or "tap" in step_lower or "this product" in step_lower:
             # Extract target - handle complex instructions like "on banner click on X"
             target = step_text
+            # C1/C3: Extract section/container hint and ordinal ("in checkout section", "second product")
+            target, context_meta = SemanticTestParser._extract_section_and_ordinal(target)
+            
+            # SPECIAL FIX: If user writes "X and then click on buynow",
+            # treat ONLY "X" as the product target (do not include the trailing
+            # "and then click on buynow" phrase).
+            # Example raw step:
+            #   "then click on lg tv 108cm and then click on buynow"
+            # We want target = "lg tv 108cm"
+            if "and then click on" in step_lower and "buy" in step_lower:
+                before_buy = re.split(r'\band then click on\b', step_text, flags=re.I)[0]
+                # Strip leading "then click on"/"click on"
+                before_buy = re.sub(r'^(then\s+)?click\s+(on\s+)?', '', before_buy, flags=re.I).strip()
+                if before_buy:
+                    target = before_buy
             
             # Pattern 1: "...banner click on X" -> extract X
             banner_match = re.search(r'banner\s+click\s+on\s+(.+)', step_text, re.I)
@@ -204,6 +289,9 @@ class SemanticTestParser:
                 if click_match:
                     target = click_match.group(1).strip()
             
+            # Base metadata for click steps (C1/C3: section, ordinal)
+            click_metadata = dict(context_meta) if context_meta else {}
+
             # Special case: category navigation
             if any(cat in step_lower for cat in ["air solutions", "category", "menu", "electronics"]):
                 return TestStep(
@@ -211,7 +299,8 @@ class SemanticTestParser:
                     type=StepType.ACTION,
                     intent=Intent.CLICK,
                     target=target,
-                    expected_state=PageState.CATEGORY
+                    expected_state=PageState.CATEGORY,
+                    metadata=click_metadata or None
                 )
             
             # Special case: product list navigation
@@ -221,11 +310,25 @@ class SemanticTestParser:
                     type=StepType.ACTION,
                     intent=Intent.CLICK,
                     target=target,
-                    expected_state=PageState.PRODUCT_LIST
+                    expected_state=PageState.PRODUCT_LIST,
+                    metadata=click_metadata or None
+                )
+            
+            # Guest checkout: "click on continue with this condition (complete purchase as guest)"
+            if any(phrase in target.lower() for phrase in ["guest", "continue as guest", "complete purchase as guest"]):
+                return TestStep(
+                    id=step_id,
+                    type=StepType.ACTION,
+                    intent=Intent.CONTINUE_AS_GUEST,
+                    target="guest",
+                    expected_state=PageState.CHECKOUT
                 )
             
             # Product selection (if contains product indicators and multiple commas)
             if ("this product" in step_lower or any(brand in step_lower for brand in ["lg", "samsung"])) and target.count(',') >= 2:
+                md = {"is_product": True, "full_description": target}
+                if click_metadata:
+                    md.update(click_metadata)
                 return TestStep(
                     id=step_id,
                     type=StepType.ACTION,
@@ -233,14 +336,15 @@ class SemanticTestParser:
                     target=target,
                     required_state=PageState.PRODUCT_LIST,
                     expected_state=PageState.PRODUCT_DETAIL,
-                    metadata={"is_product": True, "full_description": target}
+                    metadata=md
                 )
             
             return TestStep(
                 id=step_id,
                 type=StepType.ACTION,
                 intent=Intent.CLICK,
-                target=target
+                target=target,
+                metadata=click_metadata or None
             )
         
         # Select/Choose actions (products)
@@ -276,12 +380,21 @@ class SemanticTestParser:
                 expected_state=PageState.CART
             )
         
-        # Fill/Type operations
-        if "fill" in step_lower or ("then" in step_lower and "details" in step_lower):
-            # Extract what to fill
-            target = "billing and shipping details"
-            if "billing" in step_lower or "shipping" in step_lower:
-                target = "billing/shipping details"
+        # Pincode/ZIP (must be checked before generic "fill")
+        if "pincode" in step_lower or "zip" in step_lower or "postal" in step_lower:
+            pincode_match = re.search(r'\b\d{5,6}\b', step_text)
+            pincode_val = pincode_match.group() if pincode_match else "560001"
+            return TestStep(
+                id=step_id,
+                type=StepType.INPUT,
+                intent=Intent.FILL_PINCODE,
+                target="pincode",
+                value=pincode_val
+            )
+        
+        # Fill/Type operations (billing/shipping details)
+        if ("fill" in step_lower or ("then" in step_lower and "details" in step_lower)) and ("billing" in step_lower or "shipping" in step_lower or "details" in step_lower):
+            target = "billing/shipping details"
             return TestStep(
                 id=step_id,
                 type=StepType.ACTION,
@@ -310,18 +423,6 @@ class SemanticTestParser:
             )
         
         # ==================== INPUT ====================
-        
-        # Pincode/ZIP
-        if "pincode" in step_lower or "zip" in step_lower or "postal" in step_lower:
-            pincode_match = re.search(r'\b\d{5,6}\b', step_text)
-            pincode = pincode_match.group() if pincode_match else "560001"
-            return TestStep(
-                id=step_id,
-                type=StepType.INPUT,
-                intent=Intent.FILL_PINCODE,
-                target="pincode",
-                value=pincode
-            )
         
         # Email
         if "email" in step_lower:
@@ -362,6 +463,10 @@ class SemanticTestParser:
         # Select option (delivery, payment)
         if "select" in step_lower and any(opt in step_lower for opt in ["delivery", "shipping", "payment", "option"]):
             option = re.sub(r'^select\s+', '', step_text, flags=re.I).strip()
+            # Normalize long phrases like "then select free delivery option in delivery method"
+            # down to just "free delivery" so resolvers match the real label text.
+            if "free" in step_lower and "delivery" in step_lower:
+                option = "free delivery"
             return TestStep(
                 id=step_id,
                 type=StepType.ACTION,
@@ -371,7 +476,10 @@ class SemanticTestParser:
         
         # Search
         if "search" in step_lower:
-            query = re.sub(r'^search\s+(for\s+)?', '', step_text, flags=re.I).strip()
+            cleaned = re.sub(r'^(then|and|also)\s+', '', step_text, flags=re.I).strip()
+            query = re.sub(r'^search\s+(?:for\s+)?', '', cleaned, flags=re.I).strip()
+            if not query:
+                query = cleaned
             return TestStep(
                 id=step_id,
                 type=StepType.INPUT,
@@ -379,14 +487,35 @@ class SemanticTestParser:
                 target="search",
                 value=query
             )
-        
-        # Generic fallback
-        logger.warning(f"Could not parse step: '{step_text}', treating as generic CLICK")
+
+        # Generic action phrases → CLICK so any site can be automated
+        if step_lower.startswith(("open ", "press ", "hit ", "hit on ", "double-click ", "double click ")):
+            target = re.sub(r'^(open|press|hit\s+on?|double-?click)\s+', '', step_text, flags=re.I).strip().rstrip('.,;:')
+            if target:
+                return TestStep(id=step_id, type=StepType.ACTION, intent=Intent.CLICK, target=target)
+        if step_lower.startswith("go to ") and "." not in step_text.split()[-1]:
+            # "go to cart", "go to checkout" → CLICK (not navigation)
+            target = re.sub(r'^go to\s+', '', step_text, flags=re.I).strip().rstrip('.,;:')
+            if target:
+                return TestStep(id=step_id, type=StepType.ACTION, intent=Intent.CLICK, target=target)
+        if re.match(r'^submit\s*(the\s+form)?\.?$', step_lower) or step_lower.strip() == "submit":
+            return TestStep(id=step_id, type=StepType.ACTION, intent=Intent.CLICK, target="submit")
+
+        # Fill/type generic: "fill X with Y", "enter Y in X"
+        fill_match = re.search(r'^(?:fill|enter|type)\s+(.+?)\s+with\s+(.+)$', step_lower, re.I)
+        if fill_match:
+            return TestStep(id=step_id, type=StepType.INPUT, intent=Intent.TYPE, target=fill_match.group(1).strip(), value=fill_match.group(2).strip())
+        enter_in = re.search(r'^(?:enter|type)\s+(.+?)\s+in(to)?\s+(.+)$', step_lower, re.I)
+        if enter_in:
+            return TestStep(id=step_id, type=StepType.INPUT, intent=Intent.TYPE, target=enter_in.group(3).strip(), value=enter_in.group(1).strip())
+
+        # Generic fallback: treat as CLICK so resolution engine + healing can try (handles any test case)
+        logger.info(f"Parsing as generic CLICK target: '{step_text[:80]}'")
         return TestStep(
             id=step_id,
             type=StepType.ACTION,
             intent=Intent.CLICK,
-            target=step_text
+            target=step_text.strip()
         )
     
     @staticmethod

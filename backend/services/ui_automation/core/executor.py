@@ -74,10 +74,10 @@ async def execute_instructions(page: Page, instructions: List[Instruction]) -> d
                 except Exception as e1:
                     logger.debug(f"  Phase 1 failed: {e1}")
                     
-                    # Phase 2: Smart Resolver
+                    # Phase 2: Smart Resolver (returns success, selector)
                     smart_resolver_attempts += 1
                     try:
-                        clicked = await smart_resolve_click(page, target)
+                        clicked, _ = await smart_resolve_click(page, target)
                         if clicked:
                             logger.info(f"  ✅ Phase 2 success")
                     except Exception as e2:
@@ -88,7 +88,14 @@ async def execute_instructions(page: Page, instructions: List[Instruction]) -> d
                         healing_attempts += 1
                         try:
                             healing_action = await healing_agent.heal_click_failure(
-                                page, target, previous_steps
+                                page,
+                                target,
+                                previous_steps,
+                                test_context={
+                                    "total_instructions": len(instructions),
+                                    "executed": idx - 1,
+                                    "current_instruction": str(instruction),
+                                },
                             )
                             if healing_action:
                                 clicked = await healing_agent.apply_healing_action(page, healing_action)

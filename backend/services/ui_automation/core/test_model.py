@@ -15,6 +15,7 @@ class StepType(str, Enum):
     ASSERTION = "ASSERTION"        # Verify state (NO UI action)
     WAIT = "WAIT"                  # Explicit waits
     CONDITIONAL = "CONDITIONAL"    # If/else logic
+    UNKNOWN = "UNKNOWN"            # Unparseable - no CLICK fallback (Module 1)
 
 
 class Intent(str, Enum):
@@ -43,6 +44,11 @@ class Intent(str, Enum):
     FILL_PHONE = "FILL_PHONE"
     SELECT_OPTION = "SELECT_OPTION"
     
+    # Wait intents
+    WAIT = "WAIT"
+    WAIT_FOR_ELEMENT = "WAIT_FOR_ELEMENT"
+    WAIT_FOR_NAVIGATION = "WAIT_FOR_NAVIGATION"
+    
     # Assertion intents (NO UI ACTION - just validation)
     PAGE_LOADED = "PAGE_LOADED"
     ELEMENT_VISIBLE = "ELEMENT_VISIBLE"
@@ -53,6 +59,7 @@ class Intent(str, Enum):
     TEXT_CONTAINS = "TEXT_CONTAINS"
     URL_MATCHES = "URL_MATCHES"
     STATE_IS = "STATE_IS"
+    UNKNOWN = "UNKNOWN"            # Unparseable - do not treat as CLICK
 
 
 class PageState(str, Enum):

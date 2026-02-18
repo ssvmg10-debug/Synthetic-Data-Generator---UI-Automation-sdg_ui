@@ -13,9 +13,30 @@ import json
 import os
 from playwright.async_api import Page, Locator
 from difflib import SequenceMatcher
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _weighted_score(
+    semantic_similarity: float,
+    role_weight: float,
+    visibility_weight: float,
+    position_weight: float,
+    container_relevance: float,
+) -> float:
+    """
+    Module 8 — Weighted selector scoring.
+    score = semantic*0.5 + role*0.2 + visibility*0.1 + position*0.1 + container*0.1
+    All inputs in [0, 1]. Returns combined score in [0, 1].
+    """
+    return (
+        min(1.0, semantic_similarity) * 0.5
+        + min(1.0, role_weight) * 0.2
+        + min(1.0, visibility_weight) * 0.1
+        + min(1.0, position_weight) * 0.1
+        + min(1.0, container_relevance) * 0.1
+    )
 
 # 🔒 GLOBAL SELECTOR CACHE (persisted across runs)
 SELECTOR_CACHE_FILE = "selector_cache.json"
@@ -150,6 +171,56 @@ def partial_similarity(short: str, long: str) -> float:
     return token_match_score
 
 
+def _product_spec_penalty(target: str, candidate_text: str) -> float:
+    """
+    Penalize when target has specific product specs that conflict with candidate.
+    E.g. target="LG 5 Star (1.0) ... 2025" vs candidate="LG 3 Star (1.5) ... 2026" → penalty.
+    Returns multiplier (1.0 = no penalty, 0.3 = heavy penalty).
+    """
+    t, c = target.lower(), candidate_text.lower()
+    penalty = 1.0
+    # Star rating: 5 Star vs 3 Star
+    star_t = re.search(r'(\d)\s*star', t)
+    star_c = re.search(r'(\d)\s*star', c)
+    if star_t and star_c and star_t.group(1) != star_c.group(1):
+        penalty *= 0.4
+    # Ton/kW: 1.0 vs 1.5, 3.5 vs 4.4
+    for pattern in [r'\((\d+\.?\d*)\s*(?:ton|kw)', r'(\d+\.?\d*)\s*kw', r'(\d+\.?\d*)\s*ton']:
+        mt, mc = re.search(pattern, t), re.search(pattern, c)
+        if mt and mc:
+            vt, vc = float(mt.group(1)), float(mc.group(1))
+            if abs(vt - vc) > 0.1:
+                penalty *= 0.5
+            break
+    # Year: 2025 vs 2026
+    year_t = re.search(r'20\d{2}', t)
+    year_c = re.search(r'20\d{2}', c)
+    if year_t and year_c and year_t.group() != year_c.group():
+        penalty *= 0.4
+    return penalty
+
+
+# Link text we must NOT click when target is a specific category, product, or CTA (e.g. "split air conditioners", "buy now")
+GENERIC_NAV_LINK_BLOCKLIST = frozenset({
+    "shop", "promotions", "support", "contact", "careers", "news", "blog",
+    "sign in", "register", "login", "more", "view all", "see all", "explore",
+    "menu", "close", "back", "next", "previous", "search", "cart", "account",
+})
+
+
+def _target_words(target: str) -> set:
+    """Normalized words from target for overlap check."""
+    return set(re.findall(r"\b\w+\b", target.lower()))
+
+
+def _link_text_has_target_word(link_text: str, target_words: set) -> bool:
+    """True if at least one target word appears as a whole word in link text."""
+    if not target_words:
+        return True
+    link_words = set(re.findall(r"\b\w+\b", link_text.lower()))
+    return bool(target_words & link_words)
+
+
 def get_button_aliases(target: str) -> list[str]:
     """
     Get common aliases for button text.
@@ -164,8 +235,15 @@ def get_button_aliases(target: str) -> list[str]:
     # Common button alias mappings
     alias_map = {
         "add to cart": ["add to cart", "buy now", "add to bag", "add to basket", "purchase"],
+        "buy now": ["buy now", "add to cart", "add to bag", "purchase"],
+        "buynow": ["buy now", "add to cart", "add to bag", "purchase"],
         "checkout": ["checkout", "proceed to checkout", "continue", "go to checkout"],
         "continue as guest": ["continue", "continue as guest", "guest checkout", "checkout as guest", "guest", "proceed"],
+        "guest": ["continue as guest", "guest checkout", "checkout as guest", "guest", "continue", "proceed without account"],
+        "any product": ["product", "view", "details", "buy", "add to cart"],
+        "free delivery": ["free delivery", "free shipping", "standard delivery", "standard", "free", "free (standard)", "no charge"],
+        "check beside pincode": ["check", "verify", "apply", "check pincode", "verify pincode"],
+        "check": ["check", "verify", "apply", "ok"],
         "sign in": ["sign in", "log in", "login"],
         "sign up": ["sign up", "register", "create account"],
         "submit": ["submit", "send", "continue"],
@@ -180,28 +258,12 @@ def get_button_aliases(target: str) -> list[str]:
     return [target_lower]
 
 
-async def smart_resolve_click(page: Page, target: str) -> bool:
+async def smart_resolve_click(page: Page, target: str) -> Tuple[bool, Optional[str]]:
     """
-    Phase 2: Intelligent element resolution with context awareness.
+    Phase 2: Intelligent element resolution with weighted scoring (Module 8).
     
-    🔒 PHASE 6 — DETERMINISTIC BEHAVIOR:
-    1. Try cached selector first (from previous successful runs)
-    2. Score all candidates deterministically
-    3. Always pick highest score (no randomness)
-    4. Cache successful selector for future runs
-    
-    Only called if Phase 1 deterministic methods fail.
-    
-    Strategy:
-    1. Check cache for previous successful selector
-    2. Wait for dropdowns/menus to appear (after previous click)
-    3. Extract all clickable elements (visible only)
-    4. Context-aware filtering (only skip footer links for e-commerce CTAs)
-    5. Score each by text similarity (with alias support)
-    6. DETERMINISTICALLY pick highest score
-    7. Try top 5 candidates (>0.4 score)
-    8. Cache successful selector
-    9. Return success or failure
+    Returns:
+        (success, selector_used) — selector_used is set when click succeeds for cache-on-validation.
     """
     logger.info(f"🔍 Phase 2: Smart resolving '{target}'")
     
@@ -217,7 +279,7 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                     await cached_element.first.click(timeout=3000)
                     logger.info(f"  ✅ Clicked using cached selector!")
                     await page.wait_for_timeout(600)
-                    return True
+                    return (True, cached_selector)
             except Exception as e:
                 logger.debug(f"  Cached selector failed: {e}, falling back to scoring")
         
@@ -249,12 +311,21 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
         # Determine if this is an e-commerce CTA (needs aggressive filtering)
         target_lower = target.lower()
         is_ecommerce_cta = any(keyword in target_lower for keyword in [
-            'cart', 'buy', 'purchase', 'checkout', 'order', 'payment'
+            'cart',
+            'buy',
+            'purchase',
+            'checkout',
+            'order',
+            'payment',
+            # Treat delivery/shipping options as high-impact actions too
+            'delivery',
+            'shipping',
+            'free delivery',
         ])
         
         # 🔥 FIX: Detect if this is a product selection (needs product card support)
         is_product_selection = any(keyword in target_lower for keyword in [
-            'star', 'ac', 'split', 'lg', 'samsung', 'product', 'model', 'kw', 'ton', 'btu'
+            'star', 'ac', 'split', 'lg', 'samsung', 'product', 'model', 'kw', 'ton', 'btu', 'any product'
         ])
         
         if is_ecommerce_cta:
@@ -290,76 +361,84 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                             );
                         }""")
                     except:
-                        in_viewport = False  # Assume not in viewport if check fails
+                        in_viewport = False
+                    # Module 8: container relevance (main content vs footer/sidebar)
+                    try:
+                        in_main = await btn.evaluate("""el => {
+                            const m = el.closest('main, #main, [class*="content"], [class*="main"], [role="main"]');
+                            return m ? 1 : 0.7;
+                        }""")
+                    except:
+                        in_main = 0.7
                     
-                    # Check against all aliases
-                    best_score = 0.0
+                    # Check against all aliases (semantic similarity)
+                    best_semantic = 0.0
                     for alias in target_aliases:
-                        # 1. Check exact word boundaries (highest priority)
                         word_match_score = exact_word_match(alias, text)
-                        
-                        # 2. Try full similarity
                         full_score = similarity(text, alias)
-                        
-                        # 3. Try partial matching
                         partial_score = partial_similarity(alias, text)
-                        
-                        # 4. Check bidirectional substring matching
                         if alias in text_lower or text_lower in alias:
                             substring_score = 0.85
                         else:
                             substring_score = 0.0
-                        
-                        # Prioritize: word_match > substring > full > partial
                         score = max(word_match_score, substring_score, full_score, partial_score)
-                        best_score = max(best_score, score)
+                        best_semantic = max(best_semantic, score)
                     
-                    # 🔥 FIX: Boost score if element is in viewport
-                    if in_viewport:
-                        best_score *= 1.2  # 20% boost for viewport elements
-                    
-                    # LOWERED threshold from 0.5 to 0.4 for better fuzzy matching
-                    if best_score > 0.4:
-                        candidates.append((btn, text, best_score, in_viewport))
+                    # Module 8: weighted score = semantic*0.5 + role*0.2 + visibility*0.1 + position*0.1 + container*0.1
+                    combined = _weighted_score(
+                        semantic_similarity=best_semantic,
+                        role_weight=1.0,  # button
+                        visibility_weight=1.0,
+                        position_weight=1.0 if in_viewport else 0.5,
+                        container_relevance=float(in_main) if isinstance(in_main, (int, float)) else 0.7,
+                    )
+                    # Minimum semantic floor for buttons too (avoid clicking "Shop" for "buy now")
+                    if is_ecommerce_cta and best_semantic < 0.4:
+                        continue
+                    if combined > 0.25:  # lower threshold since we now use weighted
+                        candidates.append((btn, text, combined, in_viewport))
             except:
                 continue
         
-        # Sort by score descending, then by viewport presence (DETERMINISTIC - always same order)
+        # Sort by weighted score descending (DETERMINISTIC)
         candidates.sort(key=lambda x: (x[2], x[3]), reverse=True)
         
-        # Log all candidates for debugging
+        # Minimum weighted confidence (Module 8: scale 0-1)
+        min_confidence = 0.25
+        if target_lower == "any product":
+            min_confidence = 0.3
+        elif is_product_selection:
+            min_confidence = 0.35
+        elif is_ecommerce_cta:
+            min_confidence = 0.35 if any(k in target_lower for k in ["delivery", "shipping", "free delivery"]) else 0.4
+        
         if candidates:
-            logger.debug(f"  Found {len(candidates)} button candidates:")
+            logger.debug(f"  Found {len(candidates)} button candidates (weighted):")
             for i, (_, text, score, in_vp) in enumerate(candidates[:5], 1):
                 vp_marker = "📍" if in_vp else "  "
                 logger.debug(f"    {vp_marker}{i}. '{text}' (score: {score:.2f})")
+            best_combined = candidates[0][2]
+            if best_combined < min_confidence:
+                logger.warning(
+                    f"  ❌ Smart resolver button candidates below threshold "
+                    f"(best={best_combined:.2f}, min={min_confidence:.2f})"
+                )
+                return (False, None)
         
-        # 🔒 DETERMINISTIC: Try top 5 candidates in score order (increased from 3 for robustness)
         for i, (btn, text, score, in_viewport) in enumerate(candidates[:5], 1):
             try:
                 logger.debug(f"  Trying candidate {i}: '{text}' (score: {score:.2f}, in_viewport: {in_viewport})")
                 await btn.scroll_into_view_if_needed(timeout=2000)
-                
-                # Wait for button to be stable before clicking
                 await page.wait_for_timeout(400)
-                
-                # Get selector for caching
                 try:
                     selector = await btn.evaluate("el => { const id = el.id; const classes = Array.from(el.classList).join('.'); return id ? `#${id}` : (classes ? `.${classes}` : el.tagName); }")
                 except:
                     selector = None
-                
                 await btn.click(timeout=3000)
                 logger.info(f"  ✅ Clicked using smart resolver: '{text}' (score: {score:.2f})")
-                
-                # 🔒 Cache successful selector for future runs
                 if selector:
                     _cache_selector(target, page.url, selector)
-                
-                # 🔥 REMOVED: Don't wait here - let executor handle stabilization
-                # The executor knows the context and can properly wait for navigation
-                
-                return True
+                return (True, selector or f"button:has-text('{text[:50]}')")
             except Exception as e:
                 logger.debug(f"  Candidate {i} click failed: {e}")
                 continue
@@ -368,6 +447,10 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
         links = await page.locator("a:visible").all()
         logger.debug(f"  Found {len(links)} visible links")
         
+        target_words = _target_words(target)
+        is_category_or_product_link = is_product_selection or any(
+            w in target_lower for w in ("air", "split", "conditioner", "solution", "ac", "category", "product")
+        )
         candidates = []
         for link in links:
             try:
@@ -375,12 +458,24 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                 href = await link.get_attribute("href") or ""
                 
                 if text:
-                    text_lower = text.lower()
+                    text_lower = text.lower().strip()
+                    text_stripped = text_lower
                     href_lower = href.lower()
+                    
+                    # Blocklist: never click generic nav links when target is specific (category/product/CTA)
+                    if is_ecommerce_cta or is_category_or_product_link:
+                        if text_stripped in GENERIC_NAV_LINK_BLOCKLIST:
+                            logger.debug(f"  Skipping blocklisted nav link: '{text[:40]}'")
+                            continue
+                        if any(bl in text_stripped for bl in ("shop", "promotions", "support", "contact", "careers", "news", "blog")):
+                            # Only skip if link text is NOT an alias for target (e.g. "checkout" for target "checkout")
+                            alias_match = any(alias in text_stripped or text_stripped in alias for alias in target_aliases)
+                            if not alias_match:
+                                logger.debug(f"  Skipping generic nav link for specific target: '{text[:40]}'")
+                                continue
                     
                     # Only apply aggressive filtering for e-commerce CTAs
                     if is_ecommerce_cta:
-                        # CRITICAL: Skip footer/navigation/policy links ONLY for e-commerce actions
                         skip_patterns = [
                             'terms', 'condition', 'policy', 'privacy', 'cookie',
                             'about', 'contact', 'support', 'help', 'faq',
@@ -388,8 +483,6 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                             'facebook', 'twitter', 'instagram', 'social',
                             'legal', 'copyright', 'trademark', 'disclaimer'
                         ]
-                        
-                        # Skip if text or href contains skip patterns
                         if any(skip in text_lower for skip in skip_patterns):
                             logger.debug(f"  Skipping footer/nav link (CTA context): '{text}'")
                             continue
@@ -397,79 +490,65 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                             logger.debug(f"  Skipping policy link (CTA context): '{href}'")
                             continue
                     
-                    # 🔥 FIX: Check if element is in viewport (with error handling)
+                    # Category/product: link text must contain at least one word from target (avoids "Promotions" for "split air conditioners")
+                    if is_category_or_product_link and target_words:
+                        if not _link_text_has_target_word(text, target_words):
+                            logger.debug(f"  Skipping link (no target word overlap): '{text[:40]}'")
+                            continue
+                    
                     try:
                         in_viewport = await link.evaluate("""el => {
                             const rect = el.getBoundingClientRect();
-                            return (
-                                rect.top >= 0 &&
-                                rect.left >= 0 &&
-                                rect.bottom <= window.innerHeight &&
-                                rect.right <= window.innerWidth
-                            );
+                            return (rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth);
                         }""")
                     except:
-                        in_viewport = False  # Assume not in viewport if check fails
-                    
-                    # Check against all aliases
-                    best_score = 0.0
+                        in_viewport = False
+                    try:
+                        in_main = await link.evaluate("""el => { const m = el.closest('main, #main, [class*="content"], [class*="main"], [role="main"]'); return m ? 1 : 0.7; }""")
+                    except:
+                        in_main = 0.7
+                    best_semantic = 0.0
                     for alias in target_aliases:
-                        # 1. Check exact word boundaries (highest priority)
                         word_match_score = exact_word_match(alias, text)
-                        
-                        # 2. Try full similarity
                         full_score = similarity(text, alias)
-                        
-                        # 3. Try partial matching
                         partial_score = partial_similarity(alias, text)
-                        
-                        # 4. Check bidirectional substring matching
-                        if alias in text_lower or text_lower in alias:
-                            substring_score = 0.85
-                        else:
-                            substring_score = 0.0
-                        
-                        # Prioritize: word_match > substring > full > partial
+                        substring_score = 0.85 if (alias in text_lower or text_lower in alias) else 0.0
                         score = max(word_match_score, substring_score, full_score, partial_score)
-                        best_score = max(best_score, score)
-                    
-                    # 🔥 FIX: Boost score if element is in viewport
-                    if in_viewport:
-                        best_score *= 1.2  # 20% boost for viewport elements
-                    
-                    # LOWERED threshold from 0.5 to 0.4 for better fuzzy matching
-                    if best_score > 0.4:
-                        candidates.append((link, text, best_score, in_viewport))
+                        best_semantic = max(best_semantic, score)
+                    if is_product_selection and len(target) > 40 and len(text) > 40:
+                        best_semantic *= _product_spec_penalty(target, text)
+                    # Minimum semantic floor: don't click links with almost no text match (e.g. "Promotions" for "split air conditioners")
+                    if best_semantic < 0.35:
+                        logger.debug(f"  Skipping link (semantic too low {best_semantic:.2f}): '{text[:40]}'")
+                        continue
+                    combined = _weighted_score(
+                        semantic_similarity=best_semantic,
+                        role_weight=0.9,  # link
+                        visibility_weight=1.0,
+                        position_weight=1.0 if in_viewport else 0.5,
+                        container_relevance=float(in_main) if isinstance(in_main, (int, float)) else 0.7,
+                    )
+                    if combined > 0.25:
+                        candidates.append((link, text, combined, in_viewport))
             except:
                 continue
         
         candidates.sort(key=lambda x: (x[2], x[3]), reverse=True)
-        
-        # Log all link candidates
         if candidates:
-            logger.debug(f"  Found {len(candidates)} link candidates:")
-            for i, (_, text, score, in_vp) in enumerate(candidates[:5], 1):
-                vp_marker = "📍" if in_vp else "  "
-                logger.debug(f"    {vp_marker}{i}. '{text}' (score: {score:.2f})")
-        
-        # Try top 5 link candidates (increased from 3)
-        for i, (link, text, score, in_viewport) in enumerate(candidates[:5], 1):
-            try:
-                logger.debug(f"  Trying link candidate {i}: '{text}' (score: {score:.2f}, in_viewport: {in_viewport})")
-                await link.scroll_into_view_if_needed(timeout=2000)
-                
-                # Brief wait for element to be stable
-                await page.wait_for_timeout(300)
-                
-                await link.click(timeout=3000)
-                logger.info(f"  ✅ Clicked link using smart resolver: '{text}' (score: {score:.2f})")
-                
-                # 🔥 REMOVED: Don't wait here - let executor handle stabilization
-                
-                return True
-            except Exception as e:
-                logger.debug(f"  Link candidate {i} click failed: {e}")
-                continue
+            best_combined = candidates[0][2]
+            if best_combined < min_confidence:
+                logger.warning(f"  ❌ Link candidates below threshold (best={best_combined:.2f})")
+                return (False, None)
+            for i, (link, text, score, in_viewport) in enumerate(candidates[:5], 1):
+                try:
+                    await link.scroll_into_view_if_needed(timeout=2000)
+                    await page.wait_for_timeout(300)
+                    await link.click(timeout=3000)
+                    logger.info(f"  ✅ Clicked link using smart resolver: '{text}' (score: {score:.2f})")
+                    return (True, None)  # link selector not cached (rely on text next time)
+                except Exception as e:
+                    logger.debug(f"  Link candidate {i} click failed: {e}")
+                    continue
         
         # 🔥 FIX: Try product cards for product selections
         if is_product_selection:
@@ -524,6 +603,11 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                             score = max(word_match_score, substring_score, full_score, partial_score)
                             best_score = max(best_score, score)
                         
+                        # Apply product spec penalty for exact model match
+                        if len(target) > 40 and len(text) > 40:
+                            spec_penalty = _product_spec_penalty(target, text)
+                            best_score *= spec_penalty
+                        
                         # Boost for viewport
                         if in_viewport:
                             best_score *= 1.2
@@ -550,26 +634,21 @@ async def smart_resolve_click(page: Page, target: str) -> bool:
                     await page.wait_for_timeout(300)
                     await card.click(timeout=3000)
                     logger.info(f"  ✅ Clicked product card using smart resolver (score: {score:.2f})")
-                    # 🔥 REMOVED: Don't wait here - let executor handle stabilization
-                    return True
+                    return (True, None)
                 except Exception as e:
                     logger.debug(f"  Product card {i} click failed: {e}")
                     continue
         
         logger.warning(f"  ❌ Smart resolver found no good matches for '{target}'")
-        return False
+        return (False, None)
         
     except Exception as e:
         error_msg = str(e).lower()
-        
-        # 🔥 FIX: If navigation happened, the click was successful!
-        # Don't retry - let executor handle stabilization
         if "execution context was destroyed" in error_msg or "navigation" in error_msg:
             logger.info(f"  ✅ Click succeeded (caused navigation)")
-            return True
-        
+            return (True, None)
         logger.error(f"  ❌ Smart resolver error: {e}")
-        return False
+        return (False, None)
 
 
 async def smart_resolve_type(page: Page, target: str, value: str) -> bool:
@@ -584,9 +663,14 @@ async def smart_resolve_type(page: Page, target: str, value: str) -> bool:
     logger.info(f"🔍 Phase 2: Smart resolving input '{target}'")
     
     try:
-        # Get all input fields
+        # Get all input fields (visible first)
         inputs = await page.locator("input:visible, textarea:visible").all()
         logger.debug(f"  Found {len(inputs)} visible input fields")
+        
+        # Fallback: if 0 visible (LG overlay may use opacity/transform), try without :visible
+        if len(inputs) == 0 and "search" in target.lower():
+            inputs = await page.locator("input, textarea").all()
+            logger.info(f"  ⚠️ 0 visible inputs; retrying with {len(inputs)} total inputs (no :visible filter)")
         
         # First try: Check for focused/active input (common for search bars)
         try:
@@ -601,6 +685,7 @@ async def smart_resolve_type(page: Page, target: str, value: str) -> bool:
         
         # Score by placeholder, aria-label, type, and name
         candidates = []
+        input_debug = []  # For failure logging
         for inp in inputs:
             try:
                 placeholder = await inp.get_attribute("placeholder") or ""
@@ -610,14 +695,18 @@ async def smart_resolve_type(page: Page, target: str, value: str) -> bool:
                 input_id = await inp.get_attribute("id") or ""
                 
                 # Combine all attributes for fuzzy matching
-                combined = f"{placeholder} {aria_label} {name} {input_id}"
+                combined = f"{placeholder} {aria_label} {name} {input_id}".strip()
+                input_debug.append(f"type={input_type} placeholder='{placeholder[:30]}' aria-label='{aria_label[:30]}'")
                 
                 # Boost score for search-type inputs if target mentions "search"
-                base_score = similarity(combined, target) if combined.strip() else 0
+                base_score = similarity(combined, target) if combined else 0
                 
                 # Bonus for input type matching
                 if "search" in target.lower() and input_type == "search":
                     base_score += 0.3
+                elif "search" in target.lower() and input_type == "text" and not combined:
+                    # LG/overlay search often uses type=text with no placeholder
+                    base_score += 0.2
                 elif "email" in target.lower() and input_type == "email":
                     base_score += 0.3
                     
@@ -626,25 +715,43 @@ async def smart_resolve_type(page: Page, target: str, value: str) -> bool:
                 if is_enabled:
                     base_score += 0.1
                 
-                if base_score > 0.3:  # Lower threshold to catch more candidates
+                if base_score > 0.25:  # Slightly lower threshold to catch overlay search inputs
                     candidates.append((inp, combined or f"[{input_type}]", base_score))
-            except:
+            except Exception as ex:
+                logger.debug(f"  Input attr read failed: {ex}")
                 continue
         
         candidates.sort(key=lambda x: x[2], reverse=True)
         
         for i, (inp, label, score) in enumerate(candidates[:3], 1):
             try:
-                logger.debug(f"  Candidate {i}: '{label}' (score: {score:.2f})")
+                logger.info(f"  Trying candidate {i}: '{label}' (score: {score:.2f})")
                 await inp.scroll_into_view_if_needed(timeout=2000)
                 await inp.fill(value, timeout=3000)
                 logger.info(f"  ✅ Typed using smart resolver: '{label}' (score: {score:.2f})")
                 return True
             except Exception as e:
-                logger.debug(f"  Candidate {i} type failed: {e}")
+                logger.warning(f"  Candidate {i} type failed: {e}")
                 continue
         
-        logger.warning(f"  ❌ Smart resolver found no good input matches for '{target}'")
+        # Fallback: for "search" target, try input[type="search"] or first text input (with or without :visible)
+        if "search" in target.lower():
+            try:
+                search_inputs = page.locator("input[type='search'], input[type='text']")
+                if await search_inputs.count() > 0:
+                    search_input = search_inputs.first
+                    logger.info("  🔄 Fallback: Trying input[type=search] or first text input")
+                    await search_input.scroll_into_view_if_needed(timeout=2000)
+                    await search_input.fill(value, timeout=3000)
+                    logger.info("  ✅ Typed using search fallback (input[type=search/text])")
+                    return True
+            except Exception as ef:
+                logger.warning(f"  Search fallback failed: {ef}")
+        
+        logger.warning(
+            f"  ❌ Smart resolver found no good input matches for '{target}'. "
+            f"Found {len(inputs)} visible inputs: {input_debug[:5]}"
+        )
         return False
         
     except Exception as e:

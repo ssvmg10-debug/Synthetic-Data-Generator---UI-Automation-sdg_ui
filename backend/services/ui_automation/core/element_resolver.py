@@ -2,10 +2,16 @@
 Phase 1 - Smart Element Resolver
 Multi-strategy element finding WITHOUT AI/healing
 """
+import asyncio
 import logging
-from playwright.async_api import Page
 import re
+from playwright.async_api import Page
 from .valid_data_generator import generate_valid_data
+
+# Per-strategy timeout so we don't hang (e.g. on "search option" on heavy pages)
+STRATEGY_TIMEOUT_MS = 5000
+# Max total time for smart_click; then raise so executor can fall back to resolution/healing
+SMART_CLICK_TOTAL_TIMEOUT_MS = 55_000
 
 logger = logging.getLogger(__name__)
 
@@ -96,103 +102,100 @@ def _expand_select_keywords(label: str) -> list[str]:
     
     return unique_keywords
 
-async def smart_click(page: Page, label: str):
-    """
-    Try multiple strategies to find and click element.
-    NO retries, NO healing - just try different selectors.
-    
-    This alone increases success rate 30-40%.
-    """
-    logger.info(f"🎯 Clicking: {label}")
-    
+async def _smart_click_impl(page: Page, label: str) -> None:
+    """Inner implementation so we can wrap with an overall timeout."""
     # Wait for any pending navigations or dropdowns from previous action
     try:
         await page.wait_for_load_state("domcontentloaded", timeout=2000)
-    except:
+    except Exception:
         pass
-    
-    # Small wait for dropdowns/menus to appear after previous click
+
     await page.wait_for_timeout(500)
-    
-    # Candidate strategies (order matters - most reliable first)
-    candidates = [
-        # Strategy 1: Role-based (most semantic)
-        lambda: page.get_by_role("button", name=re.compile(f"^{re.escape(label)}$", re.I)),
-        lambda: page.get_by_role("link", name=re.compile(f"^{re.escape(label)}$", re.I)),
-        
-        # Strategy 2: Partial match on roles
-        lambda: page.get_by_role("button", name=re.compile(re.escape(label), re.I)),
-        lambda: page.get_by_role("link", name=re.compile(re.escape(label), re.I)),
-        
-        # Strategy 3: Text content match
-        lambda: page.get_by_text(label, exact=True),
-        lambda: page.get_by_text(re.compile(f"^{re.escape(label)}$", re.I)),
-        lambda: page.get_by_text(re.compile(re.escape(label), re.I)),
-        
-        # Strategy 4: Playwright text selector
-        lambda: page.locator(f"text={label}"),
-        lambda: page.locator(f"text=/{re.escape(label)}/i"),
-    ]
-    
-    for idx, get_candidate in enumerate(candidates, 1):
+
+    label_lower = label.lower()
+    # Search-specific strategies first (search icon/button often has role="search" or aria-label)
+    candidates_builders = []
+    if "search" in label_lower:
+        candidates_builders.extend([
+            lambda p=page: p.get_by_role("search"),
+            lambda p=page: p.locator("[aria-label*='search' i], [aria-label*='Search' i]").first,
+            lambda p=page: p.locator("button[class*='search' i], a[class*='search' i], [class*='search'][role='button']").first,
+            lambda p=page: p.get_by_role("button", name=re.compile("search", re.I)),
+            lambda p=page: p.get_by_role("link", name=re.compile("search", re.I)),
+        ])
+    # Common strategies (order matters)
+    candidates_builders.extend([
+        lambda p=page: p.get_by_role("button", name=re.compile(f"^{re.escape(label)}$", re.I)),
+        lambda p=page: p.get_by_role("link", name=re.compile(f"^{re.escape(label)}$", re.I)),
+        lambda p=page: p.get_by_role("button", name=re.compile(re.escape(label), re.I)),
+        lambda p=page: p.get_by_role("link", name=re.compile(re.escape(label), re.I)),
+        lambda p=page: p.get_by_text(label, exact=True),
+        lambda p=page: p.get_by_text(re.compile(f"^{re.escape(label)}$", re.I)),
+        lambda p=page: p.get_by_text(re.compile(re.escape(label), re.I)),
+        lambda p=page: p.locator(f"text={label}"),
+        lambda p=page: p.locator(f"text=/{re.escape(label)}/i"),
+    ])
+
+    for idx, get_candidate in enumerate(candidates_builders, 1):
         try:
-            candidate = get_candidate()
+            candidate = get_candidate(page)
+            candidate = candidate.set_timeout(STRATEGY_TIMEOUT_MS)
             count = await candidate.count()
-            
+
             if count > 0:
                 logger.debug(f"  Strategy {idx} found {count} match(es)")
-                
-                # 🔥 FIX: When multiple matches, find the one in viewport
                 if count > 1:
                     logger.debug(f"  Multiple matches found, selecting best visible candidate")
                     best_element = None
                     best_score = -1
-                    
-                    for i in range(min(count, 5)):  # Check first 5 matches max
+                    for i in range(min(count, 5)):
                         try:
-                            elem = candidate.nth(i)
-                            # Check if element is visible
-                            is_visible = await elem.is_visible()
-                            if not is_visible:
+                            elem = candidate.nth(i).set_timeout(STRATEGY_TIMEOUT_MS)
+                            if not await elem.is_visible():
                                 continue
-                            
-                            # Check if element is in viewport
                             in_viewport = await elem.evaluate("""el => {
                                 const rect = el.getBoundingClientRect();
-                                return (
-                                    rect.top >= 0 &&
-                                    rect.left >= 0 &&
-                                    rect.bottom <= window.innerHeight &&
-                                    rect.right <= window.innerWidth
-                                );
+                                return (rect.top >= 0 && rect.left >= 0 &&
+                                    rect.bottom <= window.innerHeight && rect.right <= window.innerWidth);
                             }""")
-                            
-                            # Score: in viewport = 10, visible but not in viewport = 5
                             score = 10 if in_viewport else 5
-                            
                             if score > best_score:
                                 best_score = score
                                 best_element = elem
-                        except:
+                        except Exception:
                             continue
-                    
                     if best_element:
-                        await best_element.wait_for(state="visible", timeout=5000)
-                        await best_element.click(timeout=5000)
+                        await best_element.wait_for(state="visible", timeout=STRATEGY_TIMEOUT_MS)
+                        await best_element.click(timeout=STRATEGY_TIMEOUT_MS)
                         logger.info(f"  ✅ Clicked using strategy {idx} (best match in viewport)")
                         return
                 else:
-                    # Single match, click it
-                    await candidate.first.wait_for(state="visible", timeout=5000)
-                    await candidate.first.click(timeout=5000)
+                    await candidate.first.wait_for(state="visible", timeout=STRATEGY_TIMEOUT_MS)
+                    await candidate.first.click(timeout=STRATEGY_TIMEOUT_MS)
                     logger.info(f"  ✅ Clicked using strategy {idx}")
                     return
         except Exception as e:
             logger.debug(f"  Strategy {idx} failed: {e}")
             continue
-    
-    # If all strategies fail, raise error
-    raise Exception(f"Element '{label}' not found after {len(candidates)} strategies")
+
+    raise Exception(f"Element '{label}' not found after {len(candidates_builders)} strategies")
+
+
+async def smart_click(page: Page, label: str):
+    """
+    Try multiple strategies to find and click element.
+    NO retries, NO healing - just try different selectors.
+    Uses per-strategy and total timeouts so we never hang (e.g. on search icon on heavy pages).
+    """
+    logger.info(f"🎯 Clicking: {label}")
+    try:
+        await asyncio.wait_for(
+            _smart_click_impl(page, label),
+            timeout=SMART_CLICK_TOTAL_TIMEOUT_MS / 1000.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"  smart_click timed out after {SMART_CLICK_TOTAL_TIMEOUT_MS}ms for '{label}'")
+        raise Exception(f"Click on '{label}' timed out after {SMART_CLICK_TOTAL_TIMEOUT_MS}ms")
 
 
 async def smart_type(page: Page, label: str, value: str):
@@ -231,25 +234,41 @@ async def smart_type(page: Page, label: str, value: str):
     search_scope = page
     modal_found = False
     try:
-        # Check for modal/dialog/popup (common after "Buy Now")
-        modal_selectors = [
-            "dialog:visible",
-            ".modal:visible",
-            "[role='dialog']:visible",
-            ".popup:visible",
-            "[class*='modal']:visible",
-            "[class*='Modal']:visible",
-            "[class*='dialog']:visible",
-            "[class*='Dialog']:visible"
-        ]
-        
-        for selector in modal_selectors:
-            modal = page.locator(selector)
-            if await modal.count() > 0:
-                search_scope = modal.first
-                modal_found = True
-                logger.info(f"  🎯 MODAL DETECTED ('{selector}'), scoping search to container")
-                break
+        # For "search" label: check search overlays first (LG, etc. open overlay on search icon click)
+        if "search" in label.lower():
+            search_overlay_selectors = [
+                "[class*='search'][class*='layer']:visible",
+                "[class*='search'][class*='overlay']:visible",
+                "[id*='search']:has(input):visible",
+                "[class*='SearchLayer']:visible",
+            ]
+            for sel in search_overlay_selectors:
+                overlay = page.locator(sel)
+                if await overlay.count() > 0:
+                    search_scope = overlay.first
+                    modal_found = True
+                    logger.info(f"  🎯 SEARCH OVERLAY DETECTED ('{sel}'), scoping to container")
+                    break
+
+        if not modal_found:
+            # Check for modal/dialog/popup (common after "Buy Now")
+            modal_selectors = [
+                "dialog:visible",
+                ".modal:visible",
+                "[role='dialog']:visible",
+                ".popup:visible",
+                "[class*='modal']:visible",
+                "[class*='Modal']:visible",
+                "[class*='dialog']:visible",
+                "[class*='Dialog']:visible"
+            ]
+            for selector in modal_selectors:
+                modal = page.locator(selector)
+                if await modal.count() > 0:
+                    search_scope = modal.first
+                    modal_found = True
+                    logger.info(f"  🎯 MODAL DETECTED ('{selector}'), scoping search to container")
+                    break
     except Exception as e:
         logger.debug(f"  Modal detection: {e}")
     
@@ -326,6 +345,19 @@ async def smart_type(page: Page, label: str, value: str):
         except Exception as e:
             logger.debug(f"  Aggressive fallback failed: {e}")
     
+    # Search-specific fallback: try input[type="search"] or first text input (overlays often have no placeholder)
+    if "search" in label.lower():
+        try:
+            search_inputs = search_scope.locator("input[type='search']:visible, input[type='text']:visible")
+            if await search_inputs.count() > 0:
+                first_input = search_inputs.first
+                await first_input.scroll_into_view_if_needed(timeout=2000)
+                await first_input.fill(valid_value, timeout=5000)
+                logger.info(f"  ✅ Typed using search fallback (input[type=search/text])")
+                return
+        except Exception as e:
+            logger.debug(f"  Search fallback failed: {e}")
+
     # If we reach here, all strategies failed
     logger.error(f"  ❌ All strategies exhausted for: {label}")
     
@@ -458,7 +490,8 @@ async def smart_select(page: Page, label: str, value: str = None, retry_count: i
     logger.warning(f"  ⚠️ Phase 1 failed, trying Phase 2 smart resolver")
     from .smart_resolver import smart_resolve_click
     
-    if await smart_resolve_click(page, label):
+    ok, _ = await smart_resolve_click(page, label)
+    if ok:
         logger.info(f"  ✅ Selected using smart resolver (Phase 2)")
         return
     
