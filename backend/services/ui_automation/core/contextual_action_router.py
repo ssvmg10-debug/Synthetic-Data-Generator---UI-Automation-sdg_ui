@@ -28,6 +28,7 @@ async def route_before_step(
 ) -> bool:
     """
     Run before executing a step. Resolve blocking UI when it matches current intent.
+    Loops up to 3 times to ensure cookie/consent popups are fully dismissed.
     Returns True if something was resolved (caller may re-detect state).
     """
     resolved = False
@@ -37,44 +38,75 @@ async def route_before_step(
     # Is this step guest checkout?
     is_guest_step = "guest" in step_intent_lower or "guest" in step_target_lower
 
-    # Classify visible popup
-    popup_result = await classify_visible_popup(page)
-    if popup_result is None:
-        return False
+    for attempt in range(3):
+        popup_result = await classify_visible_popup(page)
+        if popup_result is None:
+            if attempt == 0:
+                logger.debug("  route_before_step: no popup detected")
+            break
+        popup_type, modal_locator = popup_result
+        logger.info("  route_before_step: popup detected (attempt %d): %s", attempt + 1, popup_type.value)
 
-    popup_type, modal_locator = popup_result
-
-    if popup_type == PopupType.LOGIN and is_guest_step:
-        # Prefer "Continue as guest" path
-        ok = await dismiss_popup_by_type(page, PopupType.LOGIN, modal_locator, prefer_guest=True)
-        if ok:
-            logger.info("  Contextual router: dismissed login modal with guest path")
-            resolved = True
+        if popup_type == PopupType.LOGIN and is_guest_step:
+            ok = await dismiss_popup_by_type(page, PopupType.LOGIN, modal_locator, prefer_guest=True)
+            if ok:
+                logger.info("  Contextual router: dismissed login modal with guest path")
+                resolved = True
+            else:
+                ok = await dismiss_popup_by_type(page, PopupType.GENERIC, modal_locator)
+                if ok:
+                    resolved = True
+        elif popup_type == PopupType.DELIVERY:
+            try:
+                await run_flow_handlers(page, "before_select_delivery", url=url)
+            except Exception as e:
+                logger.debug(f"Flow handler before_select_delivery: {e}")
+            ok = await dismiss_popup_by_type(page, PopupType.DELIVERY, modal_locator)
+            if ok:
+                logger.info("  Contextual router: dismissed delivery modal")
+                resolved = True
+        elif popup_type == PopupType.CONSENT:
+            ok = await dismiss_popup_by_type(page, PopupType.CONSENT, modal_locator)
+            if ok:
+                resolved = True
         else:
             ok = await dismiss_popup_by_type(page, PopupType.GENERIC, modal_locator)
             if ok:
                 resolved = True
-    elif popup_type == PopupType.DELIVERY:
-        # Run site flow handler then dismiss
+
+        if not ok:
+            logger.debug("  route_before_step: could not dismiss popup, stopping")
+            break
+        await page.wait_for_timeout(400)
+
+    # LG quick menu / generic overlay: try direct close selectors so main nav (e.g. search) is clickable
+    if url and "lg.com" in url:
+        for _ in range(2):
+            try:
+                close_loc = page.locator("button.al-quick-menu__close, [aria-label='close' i], .al-quick-menu button[type='button']")
+                if await close_loc.count() > 0:
+                    first_btn = close_loc.first
+                    if await first_btn.is_visible():
+                        await first_btn.click(timeout=2000)
+                        logger.info("  Contextual router: closed LG quick menu")
+                        resolved = True
+                        break
+            except Exception:
+                pass
+            await page.wait_for_timeout(300)
+        # If modal still present, try clicking any visible "close" in dialogs
         try:
-            await run_flow_handlers(page, "before_select_delivery", url=url)
-        except Exception as e:
-            logger.debug(f"Flow handler before_select_delivery: {e}")
-        ok = await dismiss_popup_by_type(page, PopupType.DELIVERY, modal_locator)
-        if ok:
-            logger.info("  Contextual router: dismissed delivery modal")
-            resolved = True
-    elif popup_type == PopupType.CONSENT:
-        ok = await dismiss_popup_by_type(page, PopupType.CONSENT, modal_locator)
-        if ok:
-            resolved = True
-    else:
-        ok = await dismiss_popup_by_type(page, PopupType.GENERIC, modal_locator)
-        if ok:
-            resolved = True
+            again = await classify_visible_popup(page)
+            if again and not resolved:
+                _, modal2 = again
+                ok2 = await dismiss_popup_by_type(page, PopupType.GENERIC, modal2)
+                if ok2:
+                    resolved = True
+        except Exception:
+            pass
 
     if resolved:
-        await page.wait_for_timeout(500)
+        await page.wait_for_timeout(800)
     return resolved
 
 

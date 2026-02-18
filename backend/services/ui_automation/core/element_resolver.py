@@ -110,18 +110,67 @@ async def _smart_click_impl(page: Page, label: str) -> None:
     except Exception:
         pass
 
-    await page.wait_for_timeout(500)
-
-    label_lower = label.lower()
-    # Search-specific strategies first (search icon/button often has role="search" or aria-label)
+    label_lower = (label or "").strip().lower()
+    # V3: Treat "product card", "any one product", "first product" same as "any product"
+    product_step_aliases = ("product card", "any one product", "first product", "one product", "any product card")
+    if label_lower in product_step_aliases:
+        label_lower = "any product"
     candidates_builders = []
+
+    # Product list generic selection: "any product" → click first product card/link
+    if label_lower == "any product":
+        await page.wait_for_timeout(2000)  # Let search results / listing load
+        candidates_builders.extend([
+            # Search overlay/panel first (LG shows results in overlay)
+            lambda p=page: p.locator("[class*='search'] a[href*='/'], [class*='result'] a[href*='/']").first,
+            lambda p=page: p.locator("[role='dialog'] a[href], [role='listbox'] a[href]").first,
+            # Common e-commerce product card containers
+            lambda p=page: p.locator("div[class*='product'] a[href]").first,
+            lambda p=page: p.locator("article[class*='product'] a[href]").first,
+            lambda p=page: p.locator("li[class*='product'] a[href]").first,
+            # Search/result panels
+            lambda p=page: p.locator("[class*='search-result'] a[href], [class*='result-item'] a[href]").first,
+            lambda p=page: p.locator("[class*='listing'] a[href], [class*='product-list'] a[href]").first,
+            # Product-like paths (LG: /in/tv/, /in/refrigerators/, etc.)
+            lambda p=page: p.locator("a[href*='/product'], a[href*='pdp'], a[href*='/in/tv/'], a[href*='/in/']").first,
+            # Main content: first substantial link
+            lambda p=page: p.locator("main a[href*='/']").first,
+            lambda p=page: p.locator("[role='main'] a[href*='/']").first,
+            # Last resort: first link with path
+            lambda p=page: p.locator("a[href^='/']").first,
+        ])
+    else:
+        await page.wait_for_timeout(500)
+
+    # Search-specific strategies first (search icon/button often icon-only with title/aria-label/class)
     if "search" in label_lower:
         candidates_builders.extend([
-            lambda p=page: p.get_by_role("search"),
             lambda p=page: p.locator("[aria-label*='search' i], [aria-label*='Search' i]").first,
+            lambda p=page: p.locator("[title*='search' i], [title*='Search' i]").first,
+            lambda p=page: p.locator("[data-testid*='search' i], [data-action*='search' i], [data-id*='search' i]").first,
+            lambda p=page: p.locator("header [class*='search' i] a, header [class*='search' i] button, header [class*='search' i] [role='button']").first,
             lambda p=page: p.locator("button[class*='search' i], a[class*='search' i], [class*='search'][role='button']").first,
             lambda p=page: p.get_by_role("button", name=re.compile("search", re.I)),
             lambda p=page: p.get_by_role("link", name=re.compile("search", re.I)),
+            lambda p=page: p.get_by_role("search"),
+        ])
+    # Navigation / menu category strategies (e.g. "home appliances", "air solutions", "all water purifiers")
+    # Many sites use nav/header links with multi-word labels; try scoped to nav and title-case
+    is_likely_nav_category = (
+        " " in label.strip()
+        and "search" not in label_lower
+        and "check" not in label_lower
+        and "buy" not in label_lower
+        and "checkout" not in label_lower
+    )
+    if is_likely_nav_category:
+        title_case = label.strip().title()
+        escaped = re.escape(label.strip())
+        candidates_builders.extend([
+            lambda p=page, esc=escaped: p.locator("nav a, header a, [role='navigation'] a").filter(has_text=re.compile(esc, re.I)).first,
+            lambda p=page, esc=escaped: p.locator("nav button, header button, [role='navigation'] button").filter(has_text=re.compile(esc, re.I)).first,
+            lambda p=page, tc=title_case: p.get_by_role("link", name=re.compile(re.escape(tc), re.I)),
+            lambda p=page, tc=title_case: p.get_by_text(re.compile(re.escape(tc), re.I)).first,
         ])
     # Common strategies (order matters)
     candidates_builders.extend([
@@ -178,6 +227,46 @@ async def _smart_click_impl(page: Page, label: str) -> None:
             logger.debug(f"  Strategy {idx} failed: {e}")
             continue
 
+    # "Any product" final fallback: first visible link that looks like content (not auth)
+    if label_lower == "any product":
+        try:
+            index = await page.evaluate("""() => {
+                var links = document.querySelectorAll('a[href]');
+                var skipText = /^\\s*(sign\\s*in|login|join)\\s*$/i;
+                for (var i = 0; i < links.length; i++) {
+                    var a = links[i];
+                    var href = (a.getAttribute('href') || '').trim();
+                    var text = (a.innerText || '').trim().substring(0, 50);
+                    if (!href || href === '#' || href.indexOf('javascript:') === 0) continue;
+                    if (skipText.test(text)) continue;
+                    if (href.indexOf('login') >= 0 || href.indexOf('signin') >= 0 || href.indexOf('sign-up') >= 0) continue;
+                    var rect = a.getBoundingClientRect();
+                    if (rect.width < 2 || rect.height < 2) continue;
+                    var style = window.getComputedStyle(a);
+                    if (style.visibility === 'hidden' || style.display === 'none') continue;
+                    return i;
+                }
+                return -1;
+            }""")
+            if index is not None and index >= 0:
+                await page.locator("a[href]").nth(index).click(timeout=STRATEGY_TIMEOUT_MS)
+                logger.info("  Clicked using 'any product' JS fallback (first content link)")
+                return
+            # Last resort: click nth link to skip nav (try 10, 5, 3, 0)
+            loc = page.locator("a[href]")
+            n = await loc.count()
+            for idx in [10, 5, 3, 0]:
+                if n > idx:
+                    try:
+                        await loc.nth(idx).scroll_into_view_if_needed(timeout=3000)
+                        await loc.nth(idx).click(timeout=STRATEGY_TIMEOUT_MS)
+                        logger.info("  Clicked using 'any product' fallback (link index %s)", idx)
+                        return
+                    except Exception as e_idx:
+                        logger.debug("  Any product fallback index %s failed: %s", idx, e_idx)
+        except Exception as e:
+            logger.debug(f"  Any product JS fallback failed: {e}")
+
     raise Exception(f"Element '{label}' not found after {len(candidates_builders)} strategies")
 
 
@@ -224,7 +313,31 @@ async def smart_type(page: Page, label: str, value: str):
         logger.debug(f"  ⏳ Page stabilized after AJAX wait")
     except:
         pass
-    
+
+    # V3: Search — try focused input first (LG focuses search input after opening overlay)
+    if "search" in (label or "").lower():
+        try:
+            await page.wait_for_timeout(1200)
+            focused = page.locator("input:focus, textarea:focus")
+            if await focused.count() > 0:
+                await focused.first.fill(valid_value, timeout=6000)
+                await focused.first.press("Enter")
+                logger.info("  ✅ Typed into focused search input (V3)")
+                return
+        except Exception as e:
+            logger.debug("  Focused search input failed: %s", e)
+        for placeholder_sub in ("find", "search", "query", "help you"):
+            try:
+                inp = page.locator(f"input[placeholder*='{placeholder_sub}' i], textarea[placeholder*='{placeholder_sub}' i]")
+                if await inp.count() > 0:
+                    await inp.first.scroll_into_view_if_needed(timeout=2000)
+                    await inp.first.fill(valid_value, timeout=6000)
+                    await inp.first.press("Enter")
+                    logger.info("  ✅ Typed into search input (placeholder '%s')", placeholder_sub)
+                    return
+            except Exception as e:
+                logger.debug("  Placeholder %s failed: %s", placeholder_sub, e)
+
     # 🔵 CRITICAL FIX: Keyword expansion for semantic aliases
     # "pincode" → ["pincode", "pin", "zip", "postal", "delivery", "area"]
     keywords = _expand_keywords(label)
@@ -326,33 +439,34 @@ async def smart_type(page: Page, label: str, value: str):
                 logger.debug(f"  Strategy {idx} with '{keyword}' failed: {e}")
                 continue
     
-    # 🔵 AGGRESSIVE FALLBACK: If in modal, try ANY visible text/number input
+    # 🔵 AGGRESSIVE FALLBACK: If in modal, try ANY visible text/number input (V3: 6s timeout for search overlay)
     if modal_found:
         logger.warning(f"  ⚠️ No keyword matched, trying AGGRESSIVE fallback: any input in modal")
+        fill_timeout = 6000 if "search" in (label or "").lower() else 5000
         try:
-            fallback_inputs = search_scope.locator("input[type='text']:visible, input[type='number']:visible, input[type='tel']:visible, input:not([type]):visible")
+            fallback_inputs = search_scope.locator("input[type='text']:visible, input[type='search']:visible, input[type='number']:visible, input[type='tel']:visible, input:not([type]):visible")
             count = await fallback_inputs.count()
             logger.debug(f"  Found {count} fallback input candidates in modal")
             
             if count > 0:
-                # Try first input
                 first = fallback_inputs.first
-                await first.scroll_into_view_if_needed(timeout=2000)
-                await first.fill(valid_value, timeout=5000)
+                await first.scroll_into_view_if_needed(timeout=3000)
+                await first.fill(valid_value, timeout=fill_timeout)
                 await first.press("Tab")
                 logger.info(f"  ✅ Typed using AGGRESSIVE FALLBACK (first input in modal)")
                 return
         except Exception as e:
             logger.debug(f"  Aggressive fallback failed: {e}")
     
-    # Search-specific fallback: try input[type="search"] or first text input (overlays often have no placeholder)
-    if "search" in label.lower():
+    # Search-specific fallback: try input[type="search"] or first text input (V3: 6s timeout)
+    if "search" in (label or "").lower():
         try:
             search_inputs = search_scope.locator("input[type='search']:visible, input[type='text']:visible")
             if await search_inputs.count() > 0:
                 first_input = search_inputs.first
-                await first_input.scroll_into_view_if_needed(timeout=2000)
-                await first_input.fill(valid_value, timeout=5000)
+                await first_input.scroll_into_view_if_needed(timeout=3000)
+                await first_input.fill(valid_value, timeout=6000)
+                await first_input.press("Enter")
                 logger.info(f"  ✅ Typed using search fallback (input[type=search/text])")
                 return
         except Exception as e:

@@ -1,0 +1,69 @@
+{
+  "entries": {
+    "lg.com|/in|search|CLICK": {
+      "site": "lg.com",
+      "page_url": "https://www.lg.com/in",
+      "normalized_target": "search",
+      "intent": "CLICK",
+      "primary_selector": {
+        "type": "css",
+        "value": "a[href=\"#search\"]"
+      },
+      "fallback_selectors": [],
+      "dom_fingerprint": {},
+      "confidence_score": 0.98,
+      "success_count": 1,
+      "failure_count": 0,
+      "last_verified": "2026-02-18T17:44:10.447831Z"
+    },
+    "lg.com|/in|air solutions|CLICK": {
+      "site": "lg.com",
+      "page_url": "https://www.lg.com/in",
+      "normalized_target": "air solutions",
+      "intent": "CLICK",
+      "primary_selector": {
+        "type": "css",
+        "value": "role=button[name=/Air\\ Solutions/i]"
+      },
+      "fallback_selectors": [],
+      "dom_fingerprint": {},
+      "confidence_score": 0.98,
+      "success_count": 3,
+      "failure_count": 0,
+      "last_verified": "2026-02-18T18:31:38.358412Z"
+    },
+    "lg.com|/in/air-conditioners/split-air-conditioners|split air conditioners|CLICK": {
+      "site": "lg.com",
+      "page_url": "https://www.lg.com/in/air-conditioners/split-air-conditioners",
+      "normalized_target": "split air conditioners",
+      "intent": "CLICK",
+      "primary_selector": {
+        "type": "css",
+        "value": "a[href=\"/in/air-conditioners/split-air-conditioners/\"]"
+      },
+      "fallback_selectors": [],
+      "dom_fingerprint": {},
+      "confidence_score": 0.98,
+      "success_count": 1,
+      "failure_count": 0,
+      "last_verified": "2026-02-18T18:20:22.656240Z"
+    },
+    "lg.com|/in|split air conditioners|CLICK": {
+      "site": "lg.com",
+      "page_url": "https://www.lg.com/in",
+      "normalized_target": "split air conditioners",
+      "intent": "CLICK",
+      "primary_selector": {
+        "type": "css",
+        "value": "[role='button']"
+      },
+      "fallback_selectors": [],
+      "dom_fingerprint": {},
+      "confidence_score": 0.98,
+      "success_count": 2,
+      "failure_count": 0,
+      "last_verified": "2026-02-18T18:32:03.274308Z"
+    }
+  },
+  "version": 1
+}

@@ -12,6 +12,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Allow long runs for multi-step tests (e.g. 12 steps × ~30s) without killing the process
+EXECUTION_TIMEOUT_SEC = 300
+
 
 def _backend_dir() -> Path:
     """Backend root (so node_modules/@playwright/test and playwright.config resolve)."""
@@ -31,13 +34,14 @@ class PlaywrightExecutor:
         headed: bool = True,
     ) -> Dict[str, Any]:
         """Execute Playwright script. Sets SCREENSHOT_DIR for per-step screenshots and returns step_screenshots."""
-        logger.info("Starting test execution for test case %s", test_case_id)
         run_dir = self.output_dir / f"run_{test_case_id}"
         run_dir.mkdir(exist_ok=True)
         screenshot_dir = run_dir / "step_screenshots"
         screenshot_dir.mkdir(exist_ok=True)
         test_file = run_dir / "test.spec.js"
         logs_path = run_dir / "logs.txt"
+
+        logger.info("Starting test execution for test case %s (run_dir=%s, timeout=%ss)", test_case_id, run_dir.name, EXECUTION_TIMEOUT_SEC)
 
         try:
             # Remove test.use({ ... }); from script if present (Playwright Test disallows it in test file)
@@ -49,7 +53,7 @@ class PlaywrightExecutor:
                 count=1,
                 flags=re.DOTALL,
             )
-            with open(test_file, "w") as f:
+            with open(test_file, "w", encoding="utf-8") as f:
                 f.write(script_clean)
 
             backend_root = _backend_dir()
@@ -70,19 +74,20 @@ class PlaywrightExecutor:
             config_rel = "playwright.executor.config.js"
             headed_flag = "--headed" if headed else "--headless"
             cmd = f'npx playwright test "{test_file_rel}" --config={config_rel} --reporter=line {headed_flag}'
-            
-            # PHASE 1 ENHANCEMENT: Reduced timeout from 600s to 120s (fail fast)
+            logger.info("Running: %s", cmd)
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=120,  # Reduced from 600s
+                timeout=EXECUTION_TIMEOUT_SEC,
                 cwd=str(cwd),
                 shell=True,
                 env=env,
             )
+            logger.info("Subprocess finished: exit_code=%s", result.returncode)
 
             logs = f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}\n\nExit Code: {result.returncode}"
             # Always write as UTF-8 so logs.txt isn't empty on Windows due to encoding issues.
@@ -146,8 +151,10 @@ class PlaywrightExecutor:
             }
 
         except subprocess.TimeoutExpired as e:
-            # Capture partial output on timeout and persist logs for debugging.
-            timeout_logs = f"STDOUT:\\n{getattr(e, 'stdout', '') or ''}\\n\\nSTDERR:\\n{getattr(e, 'stderr', '') or ''}\\n\\nExit Code: timeout"
+            logger.warning("Test execution timed out after %ss (test_case_id=%s)", EXECUTION_TIMEOUT_SEC, test_case_id)
+            out = getattr(e, "stdout", "") or getattr(e, "output", "") or ""
+            err = getattr(e, "stderr", "") or ""
+            timeout_logs = f"STDOUT:\n{out}\n\nSTDERR:\n{err}\n\nExit Code: timeout"
             logs_path_str = None
             try:
                 with open(logs_path, "w", encoding="utf-8", errors="replace") as f:
@@ -161,7 +168,7 @@ class PlaywrightExecutor:
                 "logs_path": logs_path_str,
                 "screenshot_path": None,
                 "step_screenshots": [],
-                "error": "Timeout after 420 seconds",
+                "error": f"Test execution timed out after {EXECUTION_TIMEOUT_SEC} seconds",
             }
         except Exception as e:
             return {

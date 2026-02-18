@@ -118,10 +118,13 @@ def execute_test_node(state: UIAutomationState, db: Session) -> Dict[str, Any]:
     
     playwright_script = state["playwright_script"]
     testcase_id = state.get("testcase_id")
+    test_case_id_for_run = testcase_id if testcase_id is not None else 0
+    if test_case_id_for_run == 0 and (state.get("structured_plan") or state.get("playwright_script")):
+        logger.warning("testcase_id missing in state (using 0); execution will use run_0")
 
     try:
         executor = PlaywrightExecutor()
-        result = executor.execute(playwright_script, test_case_id=testcase_id or 0)
+        result = executor.execute(playwright_script, test_case_id=test_case_id_for_run)
         success = result.get("status") == "passed"
 
         if success:

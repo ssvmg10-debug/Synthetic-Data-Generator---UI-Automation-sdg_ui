@@ -1,15 +1,30 @@
 """
-🚀 NEW API ENDPOINT - Enhanced Deterministic System V2 Integration
-Integrates the new semantic parser + assertion engine + enhanced executor
+🚀 Combined UI Automation Workflow (default) + optional Agent-only mode:
+
+  COMBINED (use_agents=False, DEFAULT): Planner + Generator hints + DeterministicExecutorV2 + Healer
+    - PlannerAgent: natural language → structured plan.
+    - GeneratorAgent: layered selectors per step (registry + step selectors) → generator_selectors in plan.
+    - plan_to_test_case: plan → TestCase with metadata.generator_selectors.
+    - DeterministicExecutorV2: tries generator_selectors first, then execution_memory, site_knowledge,
+      element_resolver, resolution_decision_engine, healing_agent (core), Playwright HealerAgent.
+    All execution in Python; no Node/JS.
+
+  AGENT-ONLY (use_agents=True): Planner → Generator → run generated JS via Node
+    Uses PlannerAgent, GeneratorAgent, PlaywrightExecutor (npx), HealerAgent on script.
+    Does NOT use element_resolver, resolution_engine, enhanced_deterministic_executor.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
+import time
 from pathlib import Path
+from sqlalchemy.orm import Session
 
+from db import get_db
 from services.ui_automation.core.enhanced_deterministic_executor import DeterministicExecutorV2, ExecutionResult
 from services.ui_automation.core.semantic_parser import SemanticTestParser
+from services.ui_automation.core.test_model import StepType
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +41,10 @@ class TestRequestV2(BaseModel):
     # Options
     visible_browser: bool = True
     start_url: Optional[str] = None
+    use_agents: bool = False  # If True: Planner→Generator→Node/JS. If False: combined workflow (Planner + Generator hints + V2 + Healer).
+    use_planner_agents: bool = True  # When use_agents=False: use PlannerAgent for NL→plan
+    use_generator_hints: bool = True  # When use_agents=False: enrich plan with Generator's layered selectors; V2 tries them first
+    use_healer_agent_in_v2: bool = True  # When use_agents=False: use Playwright HealerAgent inside V2
     
     # Tracking
     chat_id: Optional[str] = None
@@ -53,48 +72,20 @@ class TestResponseV2(BaseModel):
 
 
 @router_v2.post("/run", response_model=TestResponseV2)
-async def run_test_v2(request: TestRequestV2):
+async def run_test_v2(request: TestRequestV2, db: Session = Depends(get_db)):
     """
-    Execute test using Enhanced Deterministic System V2
+    Execute test using Enhanced Deterministic System V2 or Agent flow (Planner → Generator → Healer).
     
-    Features:
-    - Semantic parsing (English → JSON DSL)
-    - Assertions never click (only inspect)
-    - Deterministic execution (no randomness)
-    - State validation (before/after each step)
-    - Smart waits (network idle, state changes)
+    When use_agents=True (default) and natural_language is provided:
+    - PlannerAgent plans the test, GeneratorAgent generates Playwright JS, PlaywrightExecutor runs it, HealerAgent heals on failure.
     
-    Example (Natural Language):
-    ```json
-    {
-        "natural_language": "Navigate to https://www.lg.com/in, Click Air Solutions, Verify page loaded, Select LG AC",
-        "visible_browser": true
-    }
-    ```
-    
-    Example (Enterprise Format):
-    ```json
-    {
-        "enterprise_spec": {
-            "Test Case ID": "TC_LG_001",
-            "Objective": "Verify product selection",
-            "Steps": [
-                {"Step": "Navigate to homepage", "Expected Result": "Homepage loaded"},
-                {"Step": "Click Air Solutions", "Expected Result": "Category displayed"}
-            ]
-        },
-        "visible_browser": false
-    }
-    ```
+    Otherwise: semantic parser + DeterministicExecutorV2 (Python Playwright).
     """
     logger.info("="*80)
-    logger.info("ENHANCED DETERMINISTIC SYSTEM V2 - REQUEST RECEIVED")
+    logger.info("ENHANCED DETERMINISTIC SYSTEM V3 - REQUEST RECEIVED (use_agents=%s)", request.use_agents)
     logger.info("="*80)
     
     try:
-        # Import Playwright
-        from playwright.async_api import async_playwright
-        
         # Validate input
         if not request.natural_language and not request.enterprise_spec:
             raise HTTPException(
@@ -102,6 +93,84 @@ async def run_test_v2(request: TestRequestV2):
                 detail="Either 'natural_language' or 'enterprise_spec' is required"
             )
         
+        # Agent flow: Planner → Generator → Execute generated JS (Node) → Healer. Does NOT use element_resolver / resolution_engine / enhanced_deterministic_executor.
+        if request.use_agents and request.natural_language:
+            logger.info("Using agent workflow (Planner→Generator→Node/Playwright JS); Python resolver/healing stack not used")
+            from agents.ui_automation.graph import run_ui_automation_workflow
+            t0 = time.perf_counter()
+            wf_result = await run_ui_automation_workflow(
+                test_case=request.natural_language,
+                db=db,
+                max_healing_attempts=3,
+            )
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            status = wf_result.get("status")
+            passed = status == "passed"
+            # Derive step counts from parsed natural language
+            test_case = SemanticTestParser.parse_natural_language(request.natural_language)
+            total_steps = len(test_case.steps)
+            executed_steps = total_steps if passed else 0
+            assertion_count = sum(1 for s in test_case.steps if s.type == StepType.ASSERTION)
+            action_count = sum(1 for s in test_case.steps if s.type in [StepType.ACTION, StepType.INPUT, StepType.NAVIGATION])
+            # Build plan for UI
+            def _desc(s):
+                intent = getattr(s.intent, "value", str(s.intent))
+                if s.type == StepType.NAVIGATION:
+                    return f"Navigate to {s.target or 'page'}"
+                if s.type == StepType.ACTION:
+                    return f"Click {s.target or s.value or 'element'}"
+                if s.type == StepType.INPUT:
+                    return f"Type/fill {s.value or s.target}"
+                if s.type == StepType.ASSERTION:
+                    return f"Verify {s.value or s.target}"
+                return f"{s.target or s.value or intent}"
+            plan = {
+                "test_id": "agent-flow",
+                "title": "UI Automation (Planner → Generator → Healer)",
+                "steps": [
+                    {"step": i + 1, "type": str(getattr(s.type, "value", s.type)).replace("StepType.", "").lower(), "description": _desc(s)}
+                    for i, s in enumerate(test_case.steps)
+                ],
+            }
+            checkpoints = []
+            for shot in wf_result.get("step_screenshots") or []:
+                step_id = shot.get("step", len(checkpoints) + 1)
+                checkpoints.append({
+                    "step_id": step_id,
+                    "description": f"Step {step_id}",
+                    "state": shot.get("path", "screenshot"),
+                    "timestamp": "",
+                    "success": True,
+                    "error": None,
+                })
+            logger.info("Agent flow result: status=%s steps=%d/%d duration_ms=%d", status, executed_steps, total_steps, duration_ms)
+            return TestResponseV2(
+                test_id=str(wf_result.get("testcase_id") or "agent"),
+                passed=passed,
+                total_steps=total_steps,
+                executed_steps=executed_steps,
+                failed_step=None if passed else 1,
+                error=None if passed else wf_result.get("error"),
+                duration_ms=duration_ms,
+                checkpoints=checkpoints,
+                assertion_count=assertion_count,
+                action_count=action_count,
+                plan=plan,
+                script=wf_result.get("script"),
+            )
+        
+        # Combined workflow: Planner + Generator hints + DeterministicExecutorV3 (ELR, fingerprint, Mem0) + Healer
+        logger.info(
+            "Using combined workflow: Planner + Generator hints + DeterministicExecutorV3 "
+            "(element_resolver, resolution_decision_engine, healing_agent, site_knowledge, flow_engine)"
+        )
+        from playwright.async_api import async_playwright
+        from services.ui_automation.core.plan_adapter import (
+            plan_to_test_case,
+            enrich_plan_with_elr,
+            enrich_plan_with_generator_selectors,
+        )
+
         # Launch browser
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=not request.visible_browser)
@@ -111,38 +180,58 @@ async def run_test_v2(request: TestRequestV2):
             )
             page = await context.new_page()
             
-            # Create executor
-            executor = DeterministicExecutorV2(page, context)
+            # Create executor (pass db so HealerAgent can run inside V2 when use_healer_agent_in_v2)
+            executor = DeterministicExecutorV2(
+                page,
+                context,
+                db=db if request.use_healer_agent_in_v2 else None,
+                use_healer_agent=request.use_healer_agent_in_v2,
+            )
             
-            # Execute based on input format
+            test_case_for_display = None
             if request.natural_language:
                 logger.info("Input: Natural Language")
                 logger.info("Text: %s", request.natural_language[:100] + "..." if len(request.natural_language) > 100 else request.natural_language)
                 
-                result: ExecutionResult = await executor.execute_natural_language(
-                    request.natural_language,
-                    start_url=request.start_url
-                )
+                if request.use_planner_agents:
+                    from services.ui_automation.agents.planner.agent import PlannerAgent
+                    plan = PlannerAgent().plan(request.natural_language)
+                    plan = enrich_plan_with_elr(plan, request.start_url)
+                    if request.use_generator_hints and db:
+                        plan = enrich_plan_with_generator_selectors(plan, db)
+                    test_case_for_display = plan_to_test_case(plan, request.start_url)
+                    result = await executor.execute_test_case(test_case_for_display)
+                    logger.info(
+                        "Combined workflow: Planner + %s Generator hints + DeterministicExecutorV3 + HealerAgent",
+                        "with" if request.use_generator_hints else "without",
+                    )
+                else:
+                    result = await executor.execute_natural_language(
+                        request.natural_language,
+                        start_url=request.start_url,
+                    )
+                    test_case_for_display = SemanticTestParser.parse_natural_language(
+                        request.natural_language, request.start_url
+                    )
+                    logger.info(
+                        "Combined workflow: Natural language (no planner) + DeterministicExecutorV3",
+                    )
             
             elif request.enterprise_spec:
                 logger.info("Input: Enterprise Format")
                 logger.info("Test Case ID: %s", request.enterprise_spec.get("Test Case ID", "N/A"))
-                
-                result: ExecutionResult = await executor.execute_enterprise_format(
-                    request.enterprise_spec
-                )
+                result = await executor.execute_enterprise_format(request.enterprise_spec)
+                test_case_for_display = SemanticTestParser.parse_enterprise_format(request.enterprise_spec)
             
             # Close browser
             await browser.close()
         
-        # Count assertion vs action steps
-        from services.ui_automation.core.test_model import StepType
-        
-        # Parse test case to count step types
-        if request.natural_language:
-            test_case = SemanticTestParser.parse_natural_language(request.natural_language)
-        else:
-            test_case = SemanticTestParser.parse_enterprise_format(request.enterprise_spec)
+        # Count assertion vs action steps and build plan for UI
+        test_case = test_case_for_display or (
+            SemanticTestParser.parse_natural_language(request.natural_language, request.start_url)
+            if request.natural_language
+            else SemanticTestParser.parse_enterprise_format(request.enterprise_spec)
+        )
         
         assertion_count = sum(1 for s in test_case.steps if s.type == StepType.ASSERTION)
         action_count = sum(1 for s in test_case.steps if s.type in [StepType.ACTION, StepType.INPUT, StepType.NAVIGATION])
@@ -288,7 +377,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "2.0",
-        "system": "Enhanced Deterministic System V2",
+        "system": "Enhanced Deterministic System V3",
         "features": [
             "Semantic parsing (English → JSON DSL)",
             "Assertion engine (never clicks)",

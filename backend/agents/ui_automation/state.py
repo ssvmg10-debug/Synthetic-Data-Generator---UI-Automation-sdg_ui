@@ -14,7 +14,8 @@ class UIAutomationState(TypedDict):
     # Planning
     structured_plan: Dict[str, Any]
     test_case_id: Optional[int]
-    
+    testcase_id: Optional[int]  # DB id from generate_script (used by execute_test_node)
+
     # Script Generation
     playwright_script: str
     

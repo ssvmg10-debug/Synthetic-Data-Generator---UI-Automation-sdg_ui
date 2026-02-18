@@ -25,7 +25,8 @@ class SkipRunStatusAccessFilter(logging.Filter):
 # CRITICAL: Set event loop policy BEFORE uvicorn imports anything
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    print("✓ Windows ProactorEventLoop policy set for Playwright support")
+    # Avoid non-ASCII characters in console output to prevent UnicodeEncodeError on some Windows terminals
+    print("Windows ProactorEventLoop policy set for Playwright support")
 
 if __name__ == "__main__":
     import uvicorn
@@ -41,7 +42,7 @@ if __name__ == "__main__":
     use_reload = os.getenv("UVICORN_RELOAD", "").strip().lower() in ("1", "true", "yes")
     if sys.platform == "win32" and not use_reload:
         use_reload = False
-        print("✓ Reload disabled on Windows so Playwright async works (set UVICORN_RELOAD=1 to enable)")
+        print("Reload disabled on Windows so Playwright async works (set UVICORN_RELOAD=1 to enable)")
 
     # Log config: uvicorn + app logs to console and file
     # Suppress uvicorn.access for /ui/current-run/status (frontend polling - clutters logs)

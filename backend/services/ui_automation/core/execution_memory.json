@@ -13,7 +13,27 @@
       "container_info": {}
     },
     "v2_4a2bee5171969432": {
-      "selector": null,
+      "selector": "role=button[name=/Air\\ Solutions/i]",
+      "dom_path": null,
+      "bounding_box": null,
+      "container_info": {
+        "in_main_section": null
+      }
+    },
+    "v2_2c7624ea06a708d1": {
+      "selector": "a[href=\"#search\"]",
+      "dom_path": null,
+      "bounding_box": null,
+      "container_info": {}
+    },
+    "v2_f55838486f2b0192": {
+      "selector": "a[href=\"/in/air-conditioners/split-air-conditioners/\"]",
+      "dom_path": null,
+      "bounding_box": null,
+      "container_info": {}
+    },
+    "v2_24baa0f303889711": {
+      "selector": "[role='button']",
       "dom_path": null,
       "bounding_box": null,
       "container_info": {}

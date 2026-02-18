@@ -11,6 +11,7 @@ export default defineConfig({
     proxy: {
       "/synthetic": backendUrl,
       "/ui": backendUrl,
+      "/ui-automation-v2": backendUrl,
       "/api": backendUrl,
       "/chats": backendUrl
     }

@@ -1,0 +1,3243 @@
+{
+  "pages": {
+    "https://www.lg.com/in": {
+      "privacy and cookie": {
+        "text": "Privacy and Cookie",
+        "tag": "a",
+        "href": "#"
+      },
+      "cookie settings": {
+        "text": "Cookie Settings",
+        "tag": "button",
+        "href": null
+      },
+      "accept all": {
+        "text": "Accept all",
+        "tag": "button",
+        "href": null
+      },
+      "save & proceed": {
+        "text": "Save & Proceed",
+        "tag": "button",
+        "href": null
+      },
+      "reject all": {
+        "text": "Reject All",
+        "tag": "button",
+        "href": null
+      },
+      "close the cookie setting banner": {
+        "text": "Close the Cookie Setting banner",
+        "tag": "button",
+        "href": null
+      },
+      "see our privacy policy and use of cookies.": {
+        "text": "See our Privacy Policy and use of Cookies.",
+        "tag": "a",
+        "href": "/in/privacy/#tabs-2858416bd2-item-b151aa0524-tab"
+      },
+      "previous slide": {
+        "text": "Previous Slide",
+        "tag": "button",
+        "href": null
+      },
+      "next slide": {
+        "text": "Next Slide",
+        "tag": "button",
+        "href": null
+      },
+      "pause carousel": {
+        "text": "Pause Carousel",
+        "tag": "button",
+        "href": null
+      },
+      "play carousel": {
+        "text": "Play Carousel",
+        "tag": "button",
+        "href": null
+      },
+      "close": {
+        "text": "Close",
+        "tag": "button",
+        "href": null
+      },
+      "pause": {
+        "text": "Pause",
+        "tag": "button",
+        "href": null
+      },
+      "play": {
+        "text": "Play",
+        "tag": "button",
+        "href": null
+      },
+      "{buttonname}": {
+        "text": "{buttonName}",
+        "tag": "a",
+        "href": ""
+      },
+      "investor": {
+        "text": "INVESTOR",
+        "tag": "a",
+        "href": "/in/investorrelations/"
+      },
+      "for business": {
+        "text": "For Business",
+        "tag": "a",
+        "href": "/in/business/"
+      },
+      "shop": {
+        "text": "Shop",
+        "tag": "button",
+        "href": null
+      },
+      "shop the latest": {
+        "text": "Shop The Latest",
+        "tag": "a",
+        "href": "/in/shop-the-latest/"
+      },
+      "promotions": {
+        "text": "Promotions",
+        "tag": "a",
+        "href": "/in/promotions/"
+      },
+      "best sellers": {
+        "text": "Best Sellers",
+        "tag": "a",
+        "href": "/in/best/"
+      },
+      "lg member benefits": {
+        "text": "LG Member Benefits",
+        "tag": "a",
+        "href": "/in/membership/"
+      },
+      "all lg best cares": {
+        "text": "All LG Best Cares",
+        "tag": "a",
+        "href": "/in/lg-best-care/"
+      },
+      "about lg best carenew": {
+        "text": "About LG Best CareNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/about-lg-best-care/"
+      },
+      "buy amcnew": {
+        "text": "Buy AMCNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/buy-lg-best-care/"
+      },
+      "buy cleaning servicenew": {
+        "text": "Buy Cleaning ServiceNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/bright-care/"
+      },
+      "lg special customer discount programs": {
+        "text": "LG Special Customer Discount Programs",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/"
+      },
+      "corporate employee store": {
+        "text": "Corporate Employee Store",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-partners/"
+      },
+      "students' purchase program": {
+        "text": "Students' Purchase Program",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-students/"
+      },
+      "government employees purchase program": {
+        "text": "Government Employees Purchase Program",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-governments/"
+      },
+      "small & medium business": {
+        "text": "Small & Medium Business",
+        "tag": "a",
+        "href": "/in/shop/small-medium-business-store/"
+      },
+      "it gaming offers": {
+        "text": "IT Gaming Offers",
+        "tag": "a",
+        "href": "/in/promotions/itgaming-offers/"
+      },
+      "life-upgrade sale": {
+        "text": "Life-Upgrade Sale",
+        "tag": "a",
+        "href": "/in/promotions/product-sale/"
+      },
+      "tv/audio/video": {
+        "text": "TV/Audio/Video",
+        "tag": "button",
+        "href": null
+      },
+      "tv & soundbars": {
+        "text": "TV & Soundbars",
+        "tag": "a",
+        "href": "/in/tv-soundbars/"
+      },
+      "lifestyle screens": {
+        "text": "Lifestyle Screens",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/"
+      },
+      "wireless earbuds": {
+        "text": "Wireless Earbuds",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/"
+      },
+      "oled innovation": {
+        "text": "OLED Innovation",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled-innovation/"
+      },
+      "why qned evo": {
+        "text": "Why QNED evo",
+        "tag": "a",
+        "href": "/in/tv-soundbars/why-qned-evo/"
+      },
+      "webos for entertainmentnew": {
+        "text": "webOS for EntertainmentNEW",
+        "tag": "a",
+        "href": "/in/tv-soundbars/webos-for-entertainment/"
+      },
+      "why lg ai tv": {
+        "text": "Why LG AI TV",
+        "tag": "a",
+        "href": "/in/tv-soundbars/ai-tv/"
+      },
+      "lg thinq": {
+        "text": "LG ThinQ",
+        "tag": "a",
+        "href": "/in/support/lg-thinq/"
+      },
+      "lg magazine": {
+        "text": "LG Magazine",
+        "tag": "a",
+        "href": "/in/magazine/"
+      },
+      "life's good": {
+        "text": "Life's Good",
+        "tag": "a",
+        "href": "/in/lifesgood/"
+      },
+      "all tv & soundbars": {
+        "text": "All TV & Soundbars",
+        "tag": "a",
+        "href": "/in/tv-soundbars/all-tv-soundbars/"
+      },
+      "lg signature oled": {
+        "text": "LG SIGNATURE OLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/signature-oled/"
+      },
+      "oled evo": {
+        "text": "OLED evo",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled-evo/"
+      },
+      "oled": {
+        "text": "OLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled/"
+      },
+      "miniled": {
+        "text": "MiniLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/miniled/"
+      },
+      "qned": {
+        "text": "QNED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/qned/"
+      },
+      "nanocell": {
+        "text": "NanoCell",
+        "tag": "a",
+        "href": "/in/tv-soundbars/nanocell/"
+      },
+      "8k tvs": {
+        "text": "8K TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/8k-tvs/"
+      },
+      "ultra big tvs": {
+        "text": "Ultra Big TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/ultra-big-tvs/"
+      },
+      "4k uhd tvs": {
+        "text": "4K UHD TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/4k-uhd-tvs/"
+      },
+      "smart tvs": {
+        "text": "Smart TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/smart-tvs/"
+      },
+      "television accessories": {
+        "text": "Television Accessories",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-accessories/"
+      },
+      "featured soundbars": {
+        "text": "Featured Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/"
+      },
+      "home theater soundbar": {
+        "text": "Home Theater Soundbar",
+        "tag": "a",
+        "href": "/in/tv-soundbars/home-theater-soundbar/"
+      },
+      "218 cm (86) and larger": {
+        "text": "218 cm (86) and larger",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/218cm-86-inch-and-larger-tvs/"
+      },
+      "195 cm (77) - 215 cm (85)": {
+        "text": "195 cm (77) - 215 cm (85)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/195cm-77-inch-to-215cm-85-inch-tvs/"
+      },
+      "177cm (70) - 190 cm (75)": {
+        "text": "177cm (70) - 190 cm (75)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/177cm-70-inch-to-190cm-75-inch-tvs/"
+      },
+      "165 cm (65)": {
+        "text": "165 cm (65)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/165cm-65-inch-tvs/"
+      },
+      "139 cm (55)": {
+        "text": "139 cm (55)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/139cm-55-inch-tvs/"
+      },
+      "126 cm (50)": {
+        "text": "126 cm (50)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/126cm-50-inch-tvs/"
+      },
+      "106 cm (42) - 121 cm (48)": {
+        "text": "106 cm (42) - 121 cm (48)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/106cm-42-inch-to-121cm-48-inch-tvs/"
+      },
+      "81 cm (32) and smaller": {
+        "text": "81 cm (32) and smaller",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/81cm-32-inch-and-smaller-tvs/"
+      },
+      "objet collection-pos\u00e9": {
+        "text": "Objet Collection-Pos\u00e9",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/objet-collection-pose/"
+      },
+      "gallery edition": {
+        "text": "Gallery Edition",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/gallery-edition/"
+      },
+      "stanbyme": {
+        "text": "StanbyME",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/stanbyme/"
+      },
+      "all soundbars": {
+        "text": "All Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/all-soundbars/"
+      },
+      "home theater soundbars": {
+        "text": "Home Theater Soundbars",
+        "tag": "a",
+        "href": "/in/audio/home-theater-soundbar/"
+      },
+      "soundbars with subwoofer": {
+        "text": "Soundbars with Subwoofer",
+        "tag": "a",
+        "href": "/in/audio/soundbars/soundbars-with-subwoofer/"
+      },
+      "all-in-one soundbars": {
+        "text": "All-in-one Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/all-in-one-soundbars/"
+      },
+      "all bluetooth speakers": {
+        "text": "All Bluetooth Speakers",
+        "tag": "a",
+        "href": "/in/audio/bluetooth-speakers/all-bluetooth-speakers/"
+      },
+      "portable speakers": {
+        "text": "Portable Speakers",
+        "tag": "a",
+        "href": "/in/audio/bluetooth-speakers/portable-speakers/"
+      },
+      "party speakers": {
+        "text": "Party Speakers",
+        "tag": "a",
+        "href": "/in/audio/party-speaker-xboom/"
+      },
+      "all wireless earbuds": {
+        "text": "All Wireless Earbuds",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/all-wireless-earbuds/"
+      },
+      "all hi-fi systems": {
+        "text": "All Hi-Fi Systems",
+        "tag": "a",
+        "href": "/in/audio/hi-fi-systems/"
+      },
+      "all projectors": {
+        "text": "All Projectors",
+        "tag": "a",
+        "href": "/in/projectors/"
+      },
+      "home cinema projectors": {
+        "text": "Home Cinema Projectors",
+        "tag": "a",
+        "href": "/in/projectors/home-cinema-projectors/"
+      },
+      "portable & lifestyle projectors": {
+        "text": "Portable & Lifestyle Projectors",
+        "tag": "a",
+        "href": "/in/projectors/portable-lifestyle-projectors/"
+      },
+      "tv buying guidenew": {
+        "text": "TV Buying GuideNEW",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-buying-guide/"
+      },
+      "tone free": {
+        "text": "TONE Free",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/tone-free/"
+      },
+      "home appliances": {
+        "text": "Home Appliances",
+        "tag": "button",
+        "href": null
+      },
+      "refrigerators": {
+        "text": "Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/"
+      },
+      "laundry": {
+        "text": "Laundry",
+        "tag": "a",
+        "href": "/in/laundry/"
+      },
+      "microwave ovens": {
+        "text": "Microwave Ovens",
+        "tag": "a",
+        "href": "/in/microwave-ovens/"
+      },
+      "commercial washing machine": {
+        "text": "Commercial Washing Machine",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/"
+      },
+      "all refrigerators": {
+        "text": "All Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/all-refrigerators/"
+      },
+      "moodup\u00ae": {
+        "text": "MoodUP\u00ae",
+        "tag": "a",
+        "href": "/in/refrigerators/MoodUP/"
+      },
+      "french door refrigerators": {
+        "text": "French Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/french-door-refrigerators/"
+      },
+      "side by side refrigerators": {
+        "text": "Side by Side Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/side-by-side-refrigerators/"
+      },
+      "double door refrigerators": {
+        "text": "Double Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/double-door-refrigerators/"
+      },
+      "single door refrigerators": {
+        "text": "Single Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/single-door-refrigerators/"
+      },
+      "all washing machines": {
+        "text": "All Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/all-washing-machines/"
+      },
+      "wash tower": {
+        "text": "Wash Tower",
+        "tag": "a",
+        "href": "/in/laundry/washtower/"
+      },
+      "dryers": {
+        "text": "Dryers",
+        "tag": "a",
+        "href": "/in/laundry/dryers/"
+      },
+      "washer dryers": {
+        "text": "Washer Dryers",
+        "tag": "a",
+        "href": "/in/laundry/washer-dryers/"
+      },
+      "front loading washing machines": {
+        "text": "Front Loading Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/front-loading-washing-machines/"
+      },
+      "top loading washing machines": {
+        "text": "Top Loading Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/top-loading-washing-machines/"
+      },
+      "semi automatic washing machines": {
+        "text": "Semi Automatic Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/semi-automatic-washing-machines/"
+      },
+      "all dishwashers": {
+        "text": "All Dishwashers",
+        "tag": "a",
+        "href": "/in/dishwasher/"
+      },
+      "all microwave ovens": {
+        "text": "All Microwave Ovens",
+        "tag": "a",
+        "href": "/in/microwave-ovens/all-microwave-ovens/"
+      },
+      "convertible oven": {
+        "text": "Convertible Oven",
+        "tag": "a",
+        "href": "/in/microwave-ovens/convertible-oven/"
+      },
+      "scan to cook charcoal convection microwave": {
+        "text": "Scan To Cook Charcoal Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/wifi-enabled-charcoal-convection-microwave/"
+      },
+      "charcoal convection microwave": {
+        "text": "Charcoal Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/charcoal-convection-microwave/"
+      },
+      "convection microwave": {
+        "text": "Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/convection-microwave/"
+      },
+      "grill/solo microwave": {
+        "text": "Grill/Solo Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/grill-solo-microwave/"
+      },
+      "all water purifiers": {
+        "text": "All Water Purifiers",
+        "tag": "a",
+        "href": "/in/water-purifiers/"
+      },
+      "all home appliances accessories": {
+        "text": "All Home Appliances Accessories",
+        "tag": "a",
+        "href": "/in/appliance-accessories/"
+      },
+      "commercial washer": {
+        "text": "Commercial Washer",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/commercial-washer/"
+      },
+      "commercial dryer": {
+        "text": "Commercial Dryer",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/commercial-dryer/"
+      },
+      "multi housing - self laundry": {
+        "text": "Multi Housing - Self Laundry",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/laundromat-reference/"
+      },
+      "lg essential series": {
+        "text": "LG Essential Series",
+        "tag": "a",
+        "href": "/in/essential-series/"
+      },
+      "buy accessories": {
+        "text": "Buy Accessories",
+        "tag": "a",
+        "href": "/in/promotions/accessories-sale/"
+      },
+      "air solutions": {
+        "text": "Air Solutions",
+        "tag": "button",
+        "href": null
+      },
+      "air conditioners": {
+        "text": "Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/"
+      },
+      "all air conditioners": {
+        "text": "All Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/all-air-conditioners/"
+      },
+      "split air conditioners": {
+        "text": "Split Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/split-air-conditioners/"
+      },
+      "window air conditioners": {
+        "text": "Window Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/window-air-conditioners/"
+      },
+      "all air cares": {
+        "text": "All Air Cares",
+        "tag": "a",
+        "href": "/in/air-care/"
+      },
+      "computing": {
+        "text": "Computing",
+        "tag": "button",
+        "href": null
+      },
+      "monitors": {
+        "text": "Monitors",
+        "tag": "a",
+        "href": "/in/monitors/"
+      },
+      "laptop": {
+        "text": "Laptop",
+        "tag": "a",
+        "href": "/in/laptop/"
+      },
+      "copilot+ pc": {
+        "text": "Copilot+ PC",
+        "tag": "a",
+        "href": "/in/laptop/copilotpluspc/"
+      },
+      "windows 11 home pc": {
+        "text": "Windows 11 Home PC",
+        "tag": "a",
+        "href": "/in/laptop/windows-11/"
+      },
+      "all monitors": {
+        "text": "All Monitors",
+        "tag": "a",
+        "href": "/in/monitors/all-monitors/"
+      },
+      "gaming": {
+        "text": "Gaming",
+        "tag": "a",
+        "href": "/in/monitors/gaming/"
+      },
+      "ultrawide": {
+        "text": "UltraWide",
+        "tag": "a",
+        "href": "/in/monitors/ultrawide/"
+      },
+      "uhd 4k & 5k monitors": {
+        "text": "UHD 4K & 5K Monitors",
+        "tag": "a",
+        "href": "/in/monitors/uhd-4k-5k/"
+      },
+      "fhd & qhd": {
+        "text": "FHD & QHD",
+        "tag": "a",
+        "href": "/in/monitors/fhd-qhd/"
+      },
+      "ultragear gaming oled monitors": {
+        "text": "UltraGear Gaming OLED Monitors",
+        "tag": "a",
+        "href": "/in/monitors/ultragear-gaming-oled-monitors/"
+      },
+      "smart monitors": {
+        "text": "Smart Monitors",
+        "tag": "a",
+        "href": "/in/monitors/smart-monitors/"
+      },
+      "all laptops": {
+        "text": "All Laptops",
+        "tag": "a",
+        "href": "/in/laptop/all-laptops/"
+      },
+      "lg gram": {
+        "text": "LG gram",
+        "tag": "a",
+        "href": "/in/laptop/gram/"
+      },
+      "lg gram 2 in 1": {
+        "text": "LG gram 2 in 1",
+        "tag": "a",
+        "href": "/in/laptop/gram-2-in-1/"
+      },
+      "lg gram style": {
+        "text": "LG gram Style",
+        "tag": "a",
+        "href": "/in/laptop/gram-style/"
+      },
+      "ultra pc": {
+        "text": "Ultra PC",
+        "tag": "a",
+        "href": "/in/laptop/ultra-pc/"
+      },
+      "all computer accessories": {
+        "text": "All Computer Accessories",
+        "tag": "a",
+        "href": "/in/computer-accessories/"
+      },
+      "gaming monitors": {
+        "text": "Gaming Monitors",
+        "tag": "a",
+        "href": "/in/monitors/gaming/"
+      },
+      "accessories": {
+        "text": "Accessories",
+        "tag": "button",
+        "href": null
+      },
+      "all accessories": {
+        "text": "All Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/"
+      },
+      "all refrigerators accessories": {
+        "text": "All Refrigerators Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/"
+      },
+      "water filter & filter": {
+        "text": "Water Filter & Filter",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/water-filter-filter/"
+      },
+      "tray & basket": {
+        "text": "Tray & Basket",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/tray-basket/"
+      },
+      "shelf": {
+        "text": "Shelf",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/shelf/"
+      },
+      "others": {
+        "text": "Others",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/others/"
+      },
+      "all microwave ovens accessories": {
+        "text": "All Microwave Ovens Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/microwave-ovens/"
+      },
+      "tray": {
+        "text": "Tray",
+        "tag": "a",
+        "href": "/in/care-accessories/microwave-ovens/tray/"
+      },
+      "all water purifiers accessories": {
+        "text": "All Water Purifiers Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/water-purifiers/"
+      },
+      "filter": {
+        "text": "Filter",
+        "tag": "a",
+        "href": "/in/care-accessories/water-purifiers/filter/"
+      },
+      "all washing machines accessories": {
+        "text": "All Washing Machines Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/washing-machines/"
+      },
+      "hose & hose connector": {
+        "text": "Hose & Hose Connector",
+        "tag": "a",
+        "href": "/in/care-accessories/washing-machines/hose-hose-connector/"
+      },
+      "filters": {
+        "text": "Filters",
+        "tag": "a",
+        "href": "/in/care-accessories/washing-machines/filter/"
+      },
+      "cleaner and others": {
+        "text": "Cleaner and Others",
+        "tag": "a",
+        "href": "/in/care-accessories/washing-machines/others/"
+      },
+      "all air conditioners accessories": {
+        "text": "All Air Conditioners Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/air-conditioners/"
+      },
+      "remotes": {
+        "text": "Remotes",
+        "tag": "a",
+        "href": "/in/care-accessories/air-conditioners/remote-controller/"
+      },
+      "all air purifiers accessories": {
+        "text": "All Air Purifiers Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/air-purifiers/"
+      },
+      "all tvs accessories": {
+        "text": "All TVs Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/tvs/"
+      },
+      "all signage accessories": {
+        "text": "All Signage Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/signage/"
+      },
+      "all dishwashers accessories": {
+        "text": "All Dishwashers Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/dishwashers/"
+      },
+      "rack & basket": {
+        "text": "Rack & Basket",
+        "tag": "a",
+        "href": "/in/care-accessories/dishwashers/rack-basket/"
+      },
+      "support": {
+        "text": "Support",
+        "tag": "a",
+        "href": "/in/support/"
+      },
+      "warranty information": {
+        "text": "Warranty Information",
+        "tag": "a",
+        "href": "/in/support/warranty-terms/"
+      },
+      "business warranty": {
+        "text": "Business Warranty",
+        "tag": "a",
+        "href": "/in/support/business-warranty-terms/"
+      },
+      "product registration": {
+        "text": "Product Registration",
+        "tag": "a",
+        "href": "/in/support/product-support/product-registration/"
+      },
+      "manuals & softwares": {
+        "text": "Manuals & Softwares",
+        "tag": "a",
+        "href": "/in/support/product-support/manuals-software/"
+      },
+      "troubleshoot": {
+        "text": "Troubleshoot",
+        "tag": "a",
+        "href": "/in/support/product-support/troubleshoot/"
+      },
+      "repair request": {
+        "text": "Repair Request",
+        "tag": "a",
+        "href": "/in/support/product-support/repair-request/"
+      },
+      "offering": {
+        "text": "Offering",
+        "tag": "a",
+        "href": "/in/support/offering/"
+      },
+      "track my order": {
+        "text": "Track My Order",
+        "tag": "a",
+        "href": "/in/support/order-support/track-my-order/"
+      },
+      "frequently asked questions": {
+        "text": "Frequently Asked Questions",
+        "tag": "a",
+        "href": "/in/support/order-support/frequently-asked-questions/"
+      },
+      "ha thinq promotion": {
+        "text": "HA ThinQ Promotion",
+        "tag": "a",
+        "href": "/in/appliances/thinq/"
+      },
+      "smart share": {
+        "text": "Smart Share",
+        "tag": "a",
+        "href": "/in/support/smart-share/"
+      },
+      "parts & accessories": {
+        "text": "Parts & Accessories",
+        "tag": "a",
+        "href": "/in/support/parts-accessories/"
+      },
+      "alerts!": {
+        "text": "Alerts!",
+        "tag": "a",
+        "href": "/in/support/announcement/"
+      },
+      "compliance": {
+        "text": "Compliance",
+        "tag": "a",
+        "href": "/in/compliance/"
+      },
+      "energy consumption calculator": {
+        "text": "Energy Consumption Calculator",
+        "tag": "a",
+        "href": "/in/support/energy-consumption-calculator/"
+      },
+      "service center locator": {
+        "text": "Service Center Locator",
+        "tag": "a",
+        "href": "/in/support/contact-us/locate-repair-center/"
+      },
+      "contact us": {
+        "text": "Contact Us",
+        "tag": "a",
+        "href": "/in/support/contact-us/"
+      },
+      "chatbot": {
+        "text": "Chatbot",
+        "tag": "a",
+        "href": "/in/support/contact-us/Chatbot/"
+      },
+      "whatsapp": {
+        "text": "WhatsApp",
+        "tag": "a",
+        "href": "/in/support/contact-us/WhatsApp/"
+      },
+      "email": {
+        "text": "Email",
+        "tag": "a",
+        "href": "/in/support/contact-us/email/"
+      },
+      "call appointment": {
+        "text": "Call appointment",
+        "tag": "a",
+        "href": "/in/support/contact-us/call-appointment/"
+      },
+      "email to md office": {
+        "text": "Email to MD Office",
+        "tag": "a",
+        "href": "/in/support/contact-us/Email-to-MD-Office/"
+      },
+      "email to ceo office": {
+        "text": "Email to CEO Office",
+        "tag": "a",
+        "href": "/in/support/contact-us/Email-to-CEO-Office/"
+      },
+      "lg ai": {
+        "text": "LG AI",
+        "tag": "a",
+        "href": "/in/lg-ai/"
+      },
+      "lg affectionate intelligence": {
+        "text": "LG Affectionate Intelligence",
+        "tag": "a",
+        "href": "/in/lg-ai/"
+      },
+      "lg ai tv": {
+        "text": "LG AI TV",
+        "tag": "a",
+        "href": "/in/lg-ai/lg-ai-tv/"
+      },
+      "lg ai mobility": {
+        "text": "LG AI Mobility",
+        "tag": "a",
+        "href": "/in/lg-ai/lg-ai-mobility/"
+      },
+      "search": {
+        "text": "Search",
+        "tag": "a",
+        "href": "#search"
+      },
+      "mylg": {
+        "text": "MyLG",
+        "tag": "a",
+        "href": "#"
+      },
+      "sign in / join us": {
+        "text": "Sign in / Join us",
+        "tag": "a",
+        "href": "/in/login/"
+      },
+      "register a product": {
+        "text": "Register a product",
+        "tag": "a",
+        "href": "/in/support/product-support/product-registration/"
+      },
+      "cart": {
+        "text": "Cart",
+        "tag": "a",
+        "href": "/in/cart/"
+      },
+      "sign in": {
+        "text": "Sign in",
+        "tag": "a",
+        "href": "/in/login/"
+      },
+      "open menu": {
+        "text": "Open Menu",
+        "tag": "button",
+        "href": null
+      },
+      "close menu": {
+        "text": "Close Menu",
+        "tag": "button",
+        "href": null
+      },
+      "offers": {
+        "text": "Offers",
+        "tag": "button",
+        "href": null
+      },
+      "why buy from lg": {
+        "text": "Why buy from LG",
+        "tag": "button",
+        "href": null
+      },
+      "lg best care": {
+        "text": "LG Best Care",
+        "tag": "button",
+        "href": null
+      },
+      "lg special members store": {
+        "text": "LG Special Members Store",
+        "tag": "button",
+        "href": null
+      },
+      "lg business shop": {
+        "text": "LG Business Shop",
+        "tag": "button",
+        "href": null
+      }
+    },
+    "https://www.lg.com/in/air-conditioners/split-air-conditioners?ec_model_status_code=Active": {
+      "privacy and cookie": {
+        "text": "Privacy and Cookie",
+        "tag": "a",
+        "href": "#",
+        "css": "a[href='#']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "p",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "cookie settings": {
+        "text": "Cookie Settings",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "accept all": {
+        "text": "Accept all",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "save & proceed": {
+        "text": "Save & Proceed",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "reject all": {
+        "text": "Reject All",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "close the cookie setting banner": {
+        "text": "Close the Cookie Setting banner",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "previous slide": {
+        "text": "Previous Slide",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "next slide": {
+        "text": "Next Slide",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "pause": {
+        "text": "Pause",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "play": {
+        "text": "Play",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "close": {
+        "text": "Close",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "div",
+          "template",
+          "div"
+        ]
+      },
+      "{buttonname}": {
+        "text": "{buttonName}",
+        "tag": "a",
+        "href": "",
+        "css": "",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "p",
+          "div",
+          "div",
+          "div"
+        ]
+      },
+      "investor": {
+        "text": "INVESTOR",
+        "tag": "a",
+        "href": "/in/investorrelations/",
+        "css": "a[href='/in/investorrelations/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "for business": {
+        "text": "For Business",
+        "tag": "a",
+        "href": "/in/business/",
+        "css": "a[href='/in/business/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "shop": {
+        "text": "Shop",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "shop the latest": {
+        "text": "Shop The Latest",
+        "tag": "a",
+        "href": "/in/shop-the-latest/",
+        "css": "a[href='/in/shop-the-latest/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "promotions": {
+        "text": "Promotions",
+        "tag": "a",
+        "href": "/in/promotions/",
+        "css": "a[href='/in/promotions/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "best sellers": {
+        "text": "Best Sellers",
+        "tag": "a",
+        "href": "/in/best/",
+        "css": "a[href='/in/best/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg member benefits": {
+        "text": "LG Member Benefits",
+        "tag": "a",
+        "href": "/in/membership/",
+        "css": "a[href='/in/membership/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all lg best cares": {
+        "text": "All LG Best Cares",
+        "tag": "a",
+        "href": "/in/lg-best-care/",
+        "css": "a[href='/in/lg-best-care/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "about lg best carenew": {
+        "text": "About LG Best CareNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/about-lg-best-care/",
+        "css": "a[href='/in/lg-best-care/about-lg-best-care/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "buy amcnew": {
+        "text": "Buy AMCNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/buy-lg-best-care/",
+        "css": "a[href='/in/lg-best-care/buy-lg-best-care/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "buy cleaning servicenew": {
+        "text": "Buy Cleaning ServiceNEW",
+        "tag": "a",
+        "href": "/in/lg-best-care/bright-care/",
+        "css": "a[href='/in/lg-best-care/bright-care/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg special customer discount programs": {
+        "text": "LG Special Customer Discount Programs",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/",
+        "css": "a[href='/in/shop/special-members-store/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "corporate employee store": {
+        "text": "Corporate Employee Store",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-partners/",
+        "css": "a[href='/in/shop/special-members-store/for-partners/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "students' purchase program": {
+        "text": "Students' Purchase Program",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-students/",
+        "css": "a[href='/in/shop/special-members-store/for-students/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "government employees purchase program": {
+        "text": "Government Employees Purchase Program",
+        "tag": "a",
+        "href": "/in/shop/special-members-store/for-governments/",
+        "css": "a[href='/in/shop/special-members-store/for-governments/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "small & medium business": {
+        "text": "Small & Medium Business",
+        "tag": "a",
+        "href": "/in/shop/small-medium-business-store/",
+        "css": "a[href='/in/shop/small-medium-business-store/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "it gaming offers": {
+        "text": "IT Gaming Offers",
+        "tag": "a",
+        "href": "/in/promotions/itgaming-offers/",
+        "css": "a[href='/in/promotions/itgaming-offers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "life-upgrade sale": {
+        "text": "Life-Upgrade Sale",
+        "tag": "a",
+        "href": "/in/promotions/product-sale/",
+        "css": "a[href='/in/promotions/product-sale/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "tv/audio/video": {
+        "text": "TV/Audio/Video",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "tv & soundbars": {
+        "text": "TV & Soundbars",
+        "tag": "a",
+        "href": "/in/tv-soundbars/",
+        "css": "a[href='/in/tv-soundbars/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lifestyle screens": {
+        "text": "Lifestyle Screens",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/",
+        "css": "a[href='/in/lifestyle-screens/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "wireless earbuds": {
+        "text": "Wireless Earbuds",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/",
+        "css": "a[href='/in/wireless-earbuds/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "oled innovation": {
+        "text": "OLED Innovation",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled-innovation/",
+        "css": "a[href='/in/tv-soundbars/oled-innovation/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "why qned evo": {
+        "text": "Why QNED evo",
+        "tag": "a",
+        "href": "/in/tv-soundbars/why-qned-evo/",
+        "css": "a[href='/in/tv-soundbars/why-qned-evo/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "webos for entertainmentnew": {
+        "text": "webOS for EntertainmentNEW",
+        "tag": "a",
+        "href": "/in/tv-soundbars/webos-for-entertainment/",
+        "css": "a[href='/in/tv-soundbars/webos-for-entertainment/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "why lg ai tv": {
+        "text": "Why LG AI TV",
+        "tag": "a",
+        "href": "/in/tv-soundbars/ai-tv/",
+        "css": "a[href='/in/tv-soundbars/ai-tv/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg thinq": {
+        "text": "LG ThinQ",
+        "tag": "a",
+        "href": "/in/support/lg-thinq/",
+        "css": "a[href='/in/support/lg-thinq/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg magazine": {
+        "text": "LG Magazine",
+        "tag": "a",
+        "href": "/in/magazine/",
+        "css": "a[href='/in/magazine/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "life's good": {
+        "text": "Life's Good",
+        "tag": "a",
+        "href": "/in/lifesgood/",
+        "css": "a[href='/in/lifesgood/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all tv & soundbars": {
+        "text": "All TV & Soundbars",
+        "tag": "a",
+        "href": "/in/tv-soundbars/all-tv-soundbars/",
+        "css": "a[href='/in/tv-soundbars/all-tv-soundbars/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg signature oled": {
+        "text": "LG SIGNATURE OLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/signature-oled/",
+        "css": "a[href='/in/tv-soundbars/signature-oled/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "oled evo": {
+        "text": "OLED evo",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled-evo/",
+        "css": "a[href='/in/tv-soundbars/oled-evo/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "oled": {
+        "text": "OLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/oled/",
+        "css": "a[href='/in/tv-soundbars/oled/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "miniled": {
+        "text": "MiniLED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/miniled/",
+        "css": "a[href='/in/tv-soundbars/miniled/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "qned": {
+        "text": "QNED",
+        "tag": "a",
+        "href": "/in/tv-soundbars/qned/",
+        "css": "a[href='/in/tv-soundbars/qned/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "nanocell": {
+        "text": "NanoCell",
+        "tag": "a",
+        "href": "/in/tv-soundbars/nanocell/",
+        "css": "a[href='/in/tv-soundbars/nanocell/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "8k tvs": {
+        "text": "8K TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/8k-tvs/",
+        "css": "a[href='/in/tv-soundbars/8k-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "ultra big tvs": {
+        "text": "Ultra Big TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/ultra-big-tvs/",
+        "css": "a[href='/in/tv-soundbars/ultra-big-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "4k uhd tvs": {
+        "text": "4K UHD TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/4k-uhd-tvs/",
+        "css": "a[href='/in/tv-soundbars/4k-uhd-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "smart tvs": {
+        "text": "Smart TVs",
+        "tag": "a",
+        "href": "/in/tv-soundbars/smart-tvs/",
+        "css": "a[href='/in/tv-soundbars/smart-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "television accessories": {
+        "text": "Television Accessories",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-accessories/",
+        "css": "a[href='/in/tv-soundbars/tv-accessories/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "featured soundbars": {
+        "text": "Featured Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/",
+        "css": "a[href='/in/audio/soundbars/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "home theater soundbar": {
+        "text": "Home Theater Soundbar",
+        "tag": "a",
+        "href": "/in/tv-soundbars/home-theater-soundbar/",
+        "css": "a[href='/in/tv-soundbars/home-theater-soundbar/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "218 cm (86) and larger": {
+        "text": "218 cm (86) and larger",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/218cm-86-inch-and-larger-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/218cm-86-inch-and-larger-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "195 cm (77) - 215 cm (85)": {
+        "text": "195 cm (77) - 215 cm (85)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/195cm-77-inch-to-215cm-85-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/195cm-77-inch-to-215cm-85-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "177cm (70) - 190 cm (75)": {
+        "text": "177cm (70) - 190 cm (75)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/177cm-70-inch-to-190cm-75-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/177cm-70-inch-to-190cm-75-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "165 cm (65)": {
+        "text": "165 cm (65)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/165cm-65-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/165cm-65-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "139 cm (55)": {
+        "text": "139 cm (55)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/139cm-55-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/139cm-55-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "126 cm (50)": {
+        "text": "126 cm (50)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/126cm-50-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/126cm-50-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "106 cm (42) - 121 cm (48)": {
+        "text": "106 cm (42) - 121 cm (48)",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/106cm-42-inch-to-121cm-48-inch-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/106cm-42-inch-to-121cm-48-inch-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "81 cm (32) and smaller": {
+        "text": "81 cm (32) and smaller",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-by-inch/81cm-32-inch-and-smaller-tvs/",
+        "css": "a[href='/in/tv-soundbars/tv-by-inch/81cm-32-inch-and-smaller-tvs/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "objet collection-pos\u00e9": {
+        "text": "Objet Collection-Pos\u00e9",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/objet-collection-pose/",
+        "css": "a[href='/in/lifestyle-screens/objet-collection-pose/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "gallery edition": {
+        "text": "Gallery Edition",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/gallery-edition/",
+        "css": "a[href='/in/lifestyle-screens/gallery-edition/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "stanbyme": {
+        "text": "StanbyME",
+        "tag": "a",
+        "href": "/in/lifestyle-screens/stanbyme/",
+        "css": "a[href='/in/lifestyle-screens/stanbyme/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all soundbars": {
+        "text": "All Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/all-soundbars/",
+        "css": "a[href='/in/audio/soundbars/all-soundbars/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "home theater soundbars": {
+        "text": "Home Theater Soundbars",
+        "tag": "a",
+        "href": "/in/audio/home-theater-soundbar/",
+        "css": "a[href='/in/audio/home-theater-soundbar/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "soundbars with subwoofer": {
+        "text": "Soundbars with Subwoofer",
+        "tag": "a",
+        "href": "/in/audio/soundbars/soundbars-with-subwoofer/",
+        "css": "a[href='/in/audio/soundbars/soundbars-with-subwoofer/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all-in-one soundbars": {
+        "text": "All-in-one Soundbars",
+        "tag": "a",
+        "href": "/in/audio/soundbars/all-in-one-soundbars/",
+        "css": "a[href='/in/audio/soundbars/all-in-one-soundbars/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all bluetooth speakers": {
+        "text": "All Bluetooth Speakers",
+        "tag": "a",
+        "href": "/in/audio/bluetooth-speakers/all-bluetooth-speakers/",
+        "css": "a[href='/in/audio/bluetooth-speakers/all-bluetooth-speakers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "portable speakers": {
+        "text": "Portable Speakers",
+        "tag": "a",
+        "href": "/in/audio/bluetooth-speakers/portable-speakers/",
+        "css": "a[href='/in/audio/bluetooth-speakers/portable-speakers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "party speakers": {
+        "text": "Party Speakers",
+        "tag": "a",
+        "href": "/in/audio/party-speaker-xboom/",
+        "css": "a[href='/in/audio/party-speaker-xboom/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all wireless earbuds": {
+        "text": "All Wireless Earbuds",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/all-wireless-earbuds/",
+        "css": "a[href='/in/wireless-earbuds/all-wireless-earbuds/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all hi-fi systems": {
+        "text": "All Hi-Fi Systems",
+        "tag": "a",
+        "href": "/in/audio/hi-fi-systems/",
+        "css": "a[href='/in/audio/hi-fi-systems/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all projectors": {
+        "text": "All Projectors",
+        "tag": "a",
+        "href": "/in/projectors/",
+        "css": "a[href='/in/projectors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "home cinema projectors": {
+        "text": "Home Cinema Projectors",
+        "tag": "a",
+        "href": "/in/projectors/home-cinema-projectors/",
+        "css": "a[href='/in/projectors/home-cinema-projectors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "portable & lifestyle projectors": {
+        "text": "Portable & Lifestyle Projectors",
+        "tag": "a",
+        "href": "/in/projectors/portable-lifestyle-projectors/",
+        "css": "a[href='/in/projectors/portable-lifestyle-projectors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "tv buying guidenew": {
+        "text": "TV Buying GuideNEW",
+        "tag": "a",
+        "href": "/in/tv-soundbars/tv-buying-guide/",
+        "css": "a[href='/in/tv-soundbars/tv-buying-guide/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "tone free": {
+        "text": "TONE Free",
+        "tag": "a",
+        "href": "/in/wireless-earbuds/tone-free/",
+        "css": "a[href='/in/wireless-earbuds/tone-free/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "home appliances": {
+        "text": "Home Appliances",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "refrigerators": {
+        "text": "Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/",
+        "css": "a[href='/in/refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "laundry": {
+        "text": "Laundry",
+        "tag": "a",
+        "href": "/in/laundry/",
+        "css": "a[href='/in/laundry/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "microwave ovens": {
+        "text": "Microwave Ovens",
+        "tag": "a",
+        "href": "/in/microwave-ovens/",
+        "css": "a[href='/in/microwave-ovens/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "commercial washing machine": {
+        "text": "Commercial Washing Machine",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/",
+        "css": "a[href='/in/commercial-washing-machines/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all refrigerators": {
+        "text": "All Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/all-refrigerators/",
+        "css": "a[href='/in/refrigerators/all-refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "moodup\u00ae": {
+        "text": "MoodUP\u00ae",
+        "tag": "a",
+        "href": "/in/refrigerators/MoodUP/",
+        "css": "a[href='/in/refrigerators/MoodUP/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "french door refrigerators": {
+        "text": "French Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/french-door-refrigerators/",
+        "css": "a[href='/in/refrigerators/french-door-refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "side by side refrigerators": {
+        "text": "Side by Side Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/side-by-side-refrigerators/",
+        "css": "a[href='/in/refrigerators/side-by-side-refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "double door refrigerators": {
+        "text": "Double Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/double-door-refrigerators/",
+        "css": "a[href='/in/refrigerators/double-door-refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "single door refrigerators": {
+        "text": "Single Door Refrigerators",
+        "tag": "a",
+        "href": "/in/refrigerators/single-door-refrigerators/",
+        "css": "a[href='/in/refrigerators/single-door-refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all washing machines": {
+        "text": "All Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/all-washing-machines/",
+        "css": "a[href='/in/laundry/all-washing-machines/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "wash tower": {
+        "text": "Wash Tower",
+        "tag": "a",
+        "href": "/in/laundry/washtower/",
+        "css": "a[href='/in/laundry/washtower/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "dryers": {
+        "text": "Dryers",
+        "tag": "a",
+        "href": "/in/laundry/dryers/",
+        "css": "a[href='/in/laundry/dryers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "washer dryers": {
+        "text": "Washer Dryers",
+        "tag": "a",
+        "href": "/in/laundry/washer-dryers/",
+        "css": "a[href='/in/laundry/washer-dryers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "front loading washing machines": {
+        "text": "Front Loading Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/front-loading-washing-machines/",
+        "css": "a[href='/in/laundry/front-loading-washing-machines/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "top loading washing machines": {
+        "text": "Top Loading Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/top-loading-washing-machines/",
+        "css": "a[href='/in/laundry/top-loading-washing-machines/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "semi automatic washing machines": {
+        "text": "Semi Automatic Washing Machines",
+        "tag": "a",
+        "href": "/in/laundry/semi-automatic-washing-machines/",
+        "css": "a[href='/in/laundry/semi-automatic-washing-machines/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all dishwashers": {
+        "text": "All Dishwashers",
+        "tag": "a",
+        "href": "/in/dishwasher/",
+        "css": "a[href='/in/dishwasher/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all microwave ovens": {
+        "text": "All Microwave Ovens",
+        "tag": "a",
+        "href": "/in/microwave-ovens/all-microwave-ovens/",
+        "css": "a[href='/in/microwave-ovens/all-microwave-ovens/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "convertible oven": {
+        "text": "Convertible Oven",
+        "tag": "a",
+        "href": "/in/microwave-ovens/convertible-oven/",
+        "css": "a[href='/in/microwave-ovens/convertible-oven/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "scan to cook charcoal convection microwave": {
+        "text": "Scan To Cook Charcoal Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/wifi-enabled-charcoal-convection-microwave/",
+        "css": "a[href='/in/microwave-ovens/wifi-enabled-charcoal-convection-microwave/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "charcoal convection microwave": {
+        "text": "Charcoal Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/charcoal-convection-microwave/",
+        "css": "a[href='/in/microwave-ovens/charcoal-convection-microwave/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "convection microwave": {
+        "text": "Convection Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/convection-microwave/",
+        "css": "a[href='/in/microwave-ovens/convection-microwave/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "grill/solo microwave": {
+        "text": "Grill/Solo Microwave",
+        "tag": "a",
+        "href": "/in/microwave-ovens/grill-solo-microwave/",
+        "css": "a[href='/in/microwave-ovens/grill-solo-microwave/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all water purifiers": {
+        "text": "All Water Purifiers",
+        "tag": "a",
+        "href": "/in/water-purifiers/",
+        "css": "a[href='/in/water-purifiers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all home appliances accessories": {
+        "text": "All Home Appliances Accessories",
+        "tag": "a",
+        "href": "/in/appliance-accessories/",
+        "css": "a[href='/in/appliance-accessories/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "commercial washer": {
+        "text": "Commercial Washer",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/commercial-washer/",
+        "css": "a[href='/in/commercial-washing-machines/commercial-washer/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "commercial dryer": {
+        "text": "Commercial Dryer",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/commercial-dryer/",
+        "css": "a[href='/in/commercial-washing-machines/commercial-dryer/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "multi housing - self laundry": {
+        "text": "Multi Housing - Self Laundry",
+        "tag": "a",
+        "href": "/in/commercial-washing-machines/laundromat-reference/",
+        "css": "a[href='/in/commercial-washing-machines/laundromat-reference/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg essential series": {
+        "text": "LG Essential Series",
+        "tag": "a",
+        "href": "/in/essential-series/",
+        "css": "a[href='/in/essential-series/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "buy accessories": {
+        "text": "Buy Accessories",
+        "tag": "a",
+        "href": "/in/promotions/accessories-sale/",
+        "css": "a[href='/in/promotions/accessories-sale/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "air solutions": {
+        "text": "Air Solutions",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "air conditioners": {
+        "text": "Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/",
+        "css": "a[href='/in/air-conditioners/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all air conditioners": {
+        "text": "All Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/all-air-conditioners/",
+        "css": "a[href='/in/air-conditioners/all-air-conditioners/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "split air conditioners": {
+        "text": "Split Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/split-air-conditioners/",
+        "css": "a[href='/in/air-conditioners/split-air-conditioners/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "window air conditioners": {
+        "text": "Window Air Conditioners",
+        "tag": "a",
+        "href": "/in/air-conditioners/window-air-conditioners/",
+        "css": "a[href='/in/air-conditioners/window-air-conditioners/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all air cares": {
+        "text": "All Air Cares",
+        "tag": "a",
+        "href": "/in/air-care/",
+        "css": "a[href='/in/air-care/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "computing": {
+        "text": "Computing",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "monitors": {
+        "text": "Monitors",
+        "tag": "a",
+        "href": "/in/monitors/",
+        "css": "a[href='/in/monitors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "laptop": {
+        "text": "Laptop",
+        "tag": "a",
+        "href": "/in/laptop/",
+        "css": "a[href='/in/laptop/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "copilot+ pc": {
+        "text": "Copilot+ PC",
+        "tag": "a",
+        "href": "/in/laptop/copilotpluspc/",
+        "css": "a[href='/in/laptop/copilotpluspc/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "windows 11 home pc": {
+        "text": "Windows 11 Home PC",
+        "tag": "a",
+        "href": "/in/laptop/windows-11/",
+        "css": "a[href='/in/laptop/windows-11/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all monitors": {
+        "text": "All Monitors",
+        "tag": "a",
+        "href": "/in/monitors/all-monitors/",
+        "css": "a[href='/in/monitors/all-monitors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "gaming": {
+        "text": "Gaming",
+        "tag": "a",
+        "href": "/in/monitors/gaming/",
+        "css": "a[href='/in/monitors/gaming/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "ultrawide": {
+        "text": "UltraWide",
+        "tag": "a",
+        "href": "/in/monitors/ultrawide/",
+        "css": "a[href='/in/monitors/ultrawide/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "uhd 4k & 5k monitors": {
+        "text": "UHD 4K & 5K Monitors",
+        "tag": "a",
+        "href": "/in/monitors/uhd-4k-5k/",
+        "css": "a[href='/in/monitors/uhd-4k-5k/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "fhd & qhd": {
+        "text": "FHD & QHD",
+        "tag": "a",
+        "href": "/in/monitors/fhd-qhd/",
+        "css": "a[href='/in/monitors/fhd-qhd/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "ultragear gaming oled monitors": {
+        "text": "UltraGear Gaming OLED Monitors",
+        "tag": "a",
+        "href": "/in/monitors/ultragear-gaming-oled-monitors/",
+        "css": "a[href='/in/monitors/ultragear-gaming-oled-monitors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "smart monitors": {
+        "text": "Smart Monitors",
+        "tag": "a",
+        "href": "/in/monitors/smart-monitors/",
+        "css": "a[href='/in/monitors/smart-monitors/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all laptops": {
+        "text": "All Laptops",
+        "tag": "a",
+        "href": "/in/laptop/all-laptops/",
+        "css": "a[href='/in/laptop/all-laptops/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg gram": {
+        "text": "LG gram",
+        "tag": "a",
+        "href": "/in/laptop/gram/",
+        "css": "a[href='/in/laptop/gram/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg gram 2 in 1": {
+        "text": "LG gram 2 in 1",
+        "tag": "a",
+        "href": "/in/laptop/gram-2-in-1/",
+        "css": "a[href='/in/laptop/gram-2-in-1/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "lg gram style": {
+        "text": "LG gram Style",
+        "tag": "a",
+        "href": "/in/laptop/gram-style/",
+        "css": "a[href='/in/laptop/gram-style/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "ultra pc": {
+        "text": "Ultra PC",
+        "tag": "a",
+        "href": "/in/laptop/ultra-pc/",
+        "css": "a[href='/in/laptop/ultra-pc/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all computer accessories": {
+        "text": "All Computer Accessories",
+        "tag": "a",
+        "href": "/in/computer-accessories/",
+        "css": "a[href='/in/computer-accessories/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "gaming monitors": {
+        "text": "Gaming Monitors",
+        "tag": "a",
+        "href": "/in/monitors/gaming/",
+        "css": "a[href='/in/monitors/gaming/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "accessories": {
+        "text": "Accessories",
+        "tag": "button",
+        "href": null,
+        "css": "",
+        "role": "button",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "div",
+          "li",
+          "ul",
+          "nav"
+        ]
+      },
+      "all accessories": {
+        "text": "All Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/",
+        "css": "a[href='/in/care-accessories/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all refrigerators accessories": {
+        "text": "All Refrigerators Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/",
+        "css": "a[href='/in/care-accessories/refrigerators/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "water filter & filter": {
+        "text": "Water Filter & Filter",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/water-filter-filter/",
+        "css": "a[href='/in/care-accessories/refrigerators/water-filter-filter/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "tray & basket": {
+        "text": "Tray & Basket",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/tray-basket/",
+        "css": "a[href='/in/care-accessories/refrigerators/tray-basket/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "shelf": {
+        "text": "Shelf",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/shelf/",
+        "css": "a[href='/in/care-accessories/refrigerators/shelf/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "others": {
+        "text": "Others",
+        "tag": "a",
+        "href": "/in/care-accessories/refrigerators/others/",
+        "css": "a[href='/in/care-accessories/refrigerators/others/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all microwave ovens accessories": {
+        "text": "All Microwave Ovens Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/microwave-ovens/",
+        "css": "a[href='/in/care-accessories/microwave-ovens/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "tray": {
+        "text": "Tray",
+        "tag": "a",
+        "href": "/in/care-accessories/microwave-ovens/tray/",
+        "css": "a[href='/in/care-accessories/microwave-ovens/tray/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "all water purifiers accessories": {
+        "text": "All Water Purifiers Accessories",
+        "tag": "a",
+        "href": "/in/care-accessories/water-purifiers/",
+        "css": "a[href='/in/care-accessories/water-purifiers/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      },
+      "filter": {
+        "text": "Filter",
+        "tag": "a",
+        "href": "/in/care-accessories/water-purifiers/filter/",
+        "css": "a[href='/in/care-accessories/water-purifiers/filter/']",
+        "role": "link",
+        "aria_label": "",
+        "data_testid": "",
+        "parent_chain": [
+          "li",
+          "ul",
+          "div",
+          "div"
+        ]
+      }
+    }
+  }
+}

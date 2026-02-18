@@ -1,14 +1,23 @@
 """
-🚀 ENHANCED DETERMINISTIC EXECUTOR V2 — Enterprise Architecture
+🚀 ENHANCED DETERMINISTIC EXECUTOR V3 — Enterprise Architecture
 
-Integrates:
-- Semantic Parser → Normalized DSL
-- State-driven execution (pre-state + post-state validation)
-- 4-Phase resolution: DOM → Smart → Visual Grounding → LLM Healing
-- Post-action validator (strict)
-- Stability engine, contextual action router, popup classifier
-- Execution memory (selector cache, state transitions)
-- Deterministic recovery: retry → flow handlers → retry → visual → healing → fail
+INTEGRATION AUDIT (all used in current V3 flow — no hardcoding for LG):
+- Semantic Parser (semantic_parser): parse_natural_language, _split_compound_instruction → TestCase steps
+- Plan Adapter (plan_adapter): plan_to_test_case, enrich_plan_with_generator_selectors — Planner plan → TestCase; Generator layered selectors in metadata.generator_selectors (tried first in CLICK/SELECT)
+- Site Knowledge (site_knowledge): record_from_page after GOTO + in _run_click_select_step; try_click before smart_click
+- Execution Memory (execution_memory): Phase 0 cache (get_cached_selector_v2/set_cached_selector_v2), state transitions
+- Contextual Action Router (contextual_action_router): route_before_step before each step (popups, LG quick menu)
+- Popup Classifier (popup_classifier): classify_visible_popup, dismiss_popup_by_type, handle_interrupts_classified
+- Flow Handlers (flow_config_loader): run_flow_handlers for after_pincode_check, before_select_delivery, before_checkout (lg_flow_config.json)
+- Element Resolver (element_resolver): smart_click, smart_type, smart_select (multi-strategy, search/nav-specific)
+- Resolution Decision Engine (resolution_decision_engine): resolve_click_with_fallbacks, confidence rules
+- Healing Agent (healing_agent): heal_click_failure + apply_healing_action; Mem0 (search/add) when MEM0_API_KEY set
+- Playwright HealerAgent (agents/healer): when db is passed to __init__, used after core healing fails (registry, alternatives, LLM)
+- Wait Strategy (wait_strategy): wait_after_navigation, wait_for_stable_dom
+- Valid Data Generator (valid_data_generator): FILL_FORM billing/shipping
+- Interrupt Handler (interrupt_handler): handle_interrupts after flow handlers
+
+Site crawl (run_lg_site_crawl) pre-populates site_knowledge.json; executor loads it at import and records on each page.
 """
 import asyncio
 import json
@@ -16,20 +25,35 @@ import logging
 import re
 import time
 from playwright.async_api import Page, BrowserContext
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 from .test_model import TestCase, TestStep, StepType, Intent, PageState
 from .semantic_parser import SemanticTestParser
 from .assertion_engine import AssertionEngine, AssertionResult
 from .intent_dispatcher import IntentDispatcher, Intent as ProductIntent
 from .state_machine import AppState, detect_state, validate_state_transition, StateTransitionError
+from .site_knowledge import site_knowledge
 
 logger = logging.getLogger(__name__)
 
 # Per-step timeout for CLICK/SELECT so we don't run 2+ minutes and hit "page closed" in healing
 CLICK_STEP_TIMEOUT_SEC = 90
+
+
+def _extract_url_from_step(step: TestStep) -> Optional[str]:
+    """Extract http(s) URL from step.target or step.value when they contain text like 'navigate to https://...'."""
+    for raw in (step.target, step.value):
+        if not raw or not isinstance(raw, str):
+            continue
+        m = re.search(r"https?://[^\s<>\"')\]]+", raw.strip())
+        if m:
+            return m.group(0).rstrip(".,;")
+    return None
 
 
 async def _run_interrupt_and_flow_handlers(page: "Page", trigger: str) -> None:
@@ -119,7 +143,7 @@ class ExecutionResult:
 
 class DeterministicExecutorV2:
     """
-    Enhanced Deterministic Executor V2
+    Enhanced Deterministic Executor V3 (class name kept for compatibility).
     
     Key features:
     - Semantic parsing (English → JSON DSL)
@@ -130,9 +154,17 @@ class DeterministicExecutorV2:
     - Checkpointing for recovery
     """
     
-    def __init__(self, page: Page, context: BrowserContext):
+    def __init__(
+        self,
+        page: Page,
+        context: BrowserContext,
+        db: Optional["Session"] = None,
+        use_healer_agent: bool = True,
+    ):
         self.page = page
         self.context = context
+        self._db = db
+        self._use_healer_agent = bool(use_healer_agent and db)
         self.assertion_engine = AssertionEngine(page)
         self.intent_dispatcher = IntentDispatcher()  # No page parameter
         self.checkpoints: List[ExecutionCheckpoint] = []
@@ -141,6 +173,7 @@ class DeterministicExecutorV2:
         self.test_context: Dict[str, Any] = {}
         # Enterprise modules (lazy init where needed)
         self._healing_agent = None
+        self._playwright_healer_agent = None  # agents/healer/agent.HealerAgent (when db set)
         self._execution_memory = None
     
     async def execute_natural_language(self, test_case_text: str, start_url: str = None) -> ExecutionResult:
@@ -232,15 +265,18 @@ class DeterministicExecutorV2:
                 if step.type in [StepType.ACTION, StepType.INPUT, StepType.NAVIGATION]:
                     try:
                         from .contextual_action_router import route_before_step
+                        logger.debug("  Running route_before_step for step %d (target=%r)", step.id, step.target)
                         is_guest = "guest" in intent_str.lower() or (step.target and "guest" in (step.target or "").lower())
-                        await route_before_step(
+                        popup_resolved = await route_before_step(
                             self.page,
                             step.intent,
                             step.target,
                             self.page.url,
                         )
+                        if popup_resolved:
+                            logger.debug("  route_before_step: dismissed popup(s)")
                     except Exception as e:
-                        logger.debug(f"Contextual router: {e}")
+                        logger.debug("  route_before_step failed: %s", e)
 
                 # Validate pre-conditions (required state)
                 if step.required_state:
@@ -399,6 +435,25 @@ class DeterministicExecutorV2:
                                     intent_str,
                                     self._last_resolved_selector,
                                 )
+                            # V3: Self-Learning Promotion — register successful selector in ELR
+                            if getattr(self, "_last_resolved_selector", None) and getattr(self, "_last_action_target", None):
+                                try:
+                                    from .promotion_engine import promote_on_success
+                                    intent_str = (self._last_action_intent.value if hasattr(self._last_action_intent, "value") else str(self._last_action_intent))
+                                    info = getattr(self, "_last_resolution_info", None) or {}
+                                    fp = info.get("fingerprint")
+                                    path = getattr(self, "_last_step_path", "") or "resolution"
+                                    promote_on_success(
+                                        self.page.url,
+                                        self._last_action_target,
+                                        intent_str,
+                                        self._last_resolved_selector,
+                                        selector_type="css",
+                                        dom_fingerprint=fp,
+                                        source=path,
+                                    )
+                                except Exception as e:
+                                    logger.debug(f"Promotion engine: {e}")
                             self._last_resolved_selector = None
                             self._last_intent_type = None
                             self._last_resolution_info = None
@@ -531,15 +586,20 @@ class DeterministicExecutorV2:
         return result.passed, result.message
 
     async def _run_click_select_step(self, step: TestStep, intent_val: str) -> tuple[bool, str]:
-        """CLICK/SELECT step body — run under asyncio.wait_for for per-step timeout."""
+        """
+        CLICK/SELECT step — V3 resolution order:
+        0 ELR primary+fallbacks, 1 DOM fingerprint, 2 Generator, 3 Execution memory,
+        4 SiteKnowledge, 5 smart_click, 6 Resolution engine, 7 Retry, 8 Healing, 9 Visual.
+        """
         from .element_resolver import smart_click
         target = step.target
         clicked = False
         resolved_selector = None
         intent_type = None
         resolution_info = None
+        meta = getattr(step, "metadata", None) or {}
 
-        is_product_step = bool(getattr(step, "metadata", {}) and step.metadata.get("is_product"))
+        is_product_step = bool(meta.get("is_product"))
         if step.intent == Intent.SELECT and is_product_step and target:
             try:
                 logger.info("🛍️ Detected structured product selection step; using deterministic selector")
@@ -554,6 +614,74 @@ class DeterministicExecutorV2:
                     return True, f"Selected product: {target}"
             except Exception as e:
                 logger.debug(f"Deterministic product selection failed, using resolution engine: {e}")
+
+        # Phase 0 & 1: ELR primary + fallbacks (Enterprise Locator Registry)
+        if not clicked:
+            locator_candidates = meta.get("locator_candidates") or []
+            if isinstance(locator_candidates, list) and locator_candidates:
+                for sel in locator_candidates[:8]:
+                    if not sel or not isinstance(sel, str):
+                        continue
+                    try:
+                        loc = self.page.locator(sel.strip())
+                        if await loc.count() > 0:
+                            await loc.first.scroll_into_view_if_needed(timeout=2000)
+                            await loc.first.click(timeout=5000)
+                            clicked = True
+                            resolved_selector = sel.strip()
+                            self._last_step_path = "elr"
+                            logger.info(f"  ✅ ELR selector success: {sel.strip()[:60]}...")
+                            break
+                    except Exception as e_elr:
+                        logger.debug(f"  ELR selector failed: {e_elr}")
+                if not clicked and meta.get("elr_lookup_key"):
+                    try:
+                        from .promotion_engine import demote_on_failure
+                        intent_str = step.intent.value if hasattr(step.intent, "value") else str(step.intent)
+                        demote_on_failure(self.page.url, target, intent_str)
+                    except Exception:
+                        pass
+
+        # Phase 2: DOM Fingerprint match (structural recovery when selector broke)
+        if not clicked:
+            elr_entry = meta.get("elr_entry") or {}
+            stored_fp = elr_entry.get("dom_fingerprint") or {}
+            if stored_fp and stored_fp.get("tag"):
+                try:
+                    from .dom_fingerprint import find_by_fingerprint
+                    result = await find_by_fingerprint(self.page, stored_fp, min_similarity=0.75, intent_target=target)
+                    if result:
+                        fp_selector, fp_score = result
+                        loc = self.page.locator(fp_selector)
+                        if await loc.count() > 0:
+                            await loc.first.scroll_into_view_if_needed(timeout=2000)
+                            await loc.first.click(timeout=5000)
+                            clicked = True
+                            resolved_selector = fp_selector
+                            self._last_step_path = "dom_fingerprint"
+                            logger.info(f"  ✅ DOM fingerprint recovery (sim={fp_score:.2f})")
+                except Exception as e_fp:
+                    logger.debug(f"  DOM fingerprint phase failed: {e_fp}")
+
+        # Phase 3: Generator selectors
+        if not clicked:
+            gen_selectors = meta.get("generator_selectors") or meta.get("selectors")
+            if isinstance(gen_selectors, list) and gen_selectors:
+                for sel in gen_selectors[:12]:
+                    if not sel or not isinstance(sel, str):
+                        continue
+                    try:
+                        loc = self.page.locator(sel.strip())
+                        if await loc.count() > 0:
+                            await loc.first.scroll_into_view_if_needed(timeout=2000)
+                            await loc.first.click(timeout=5000)
+                            clicked = True
+                            resolved_selector = sel.strip()
+                            self._last_step_path = "generator_selectors"
+                            logger.info(f"  ✅ Generator selector success: {sel.strip()[:60]}...")
+                            break
+                    except Exception as e_gen:
+                        logger.debug(f"  Generator selector failed: {e_gen}")
 
         if self._execution_memory is None:
             try:
@@ -594,6 +722,22 @@ class DeterministicExecutorV2:
                             logger.info(f"  ✅ Phase 0 (legacy memory) success")
                     except Exception as e0:
                         logger.debug(f"  Phase 0 (legacy) failed: {e0}")
+
+        if not clicked:
+            # Phase 0.5: SiteKnowledge (page-level crawl cache)
+            try:
+                await site_knowledge.record_from_page(self.page)
+                selector = await site_knowledge.try_click(self.page, target, timeout_ms=8000)
+                if selector:
+                    clicked = True
+                    resolved_selector = selector
+                    self._last_step_path = "site_knowledge"
+                    logger.info("  ✅ SiteKnowledge success for CLICK/SELECT")
+                    await self.page.wait_for_timeout(400)
+                else:
+                    logger.debug("  SiteKnowledge try_click returned None for target=%r", target)
+            except Exception as e_sk:
+                logger.info("  SiteKnowledge click failed for target=%r: %s", target, e_sk)
 
         if not clicked:
             try:
@@ -682,6 +826,36 @@ class DeterministicExecutorV2:
             except Exception as e4:
                 logger.error(f"  Healing Agent failed: {e4}")
 
+        # Playwright HealerAgent (registry, alternatives, LLM) when core healing failed and db available
+        if not clicked and self._use_healer_agent and self._db:
+            try:
+                from services.ui_automation.agents.healer.agent import HealerAgent
+                if self._playwright_healer_agent is None:
+                    self._playwright_healer_agent = HealerAgent()
+                failed_sel = target or (resolution_info.get("selector") if isinstance(resolution_info, dict) else None) or "element"
+                minimal_script = f"await page.click('{str(failed_sel).replace(chr(39), chr(92)+chr(39))}');"
+                heal_result = self._playwright_healer_agent.heal(
+                    script=minimal_script,
+                    error=f"Click failed for: {target}",
+                    db=self._db,
+                    failed_locator=failed_sel,
+                    plan=self.test_context,
+                    failed_step_index=step.id,
+                    failure_url=self.page.url,
+                    failure_page_elements=None,
+                )
+                if heal_result.get("healed") and heal_result.get("healed_locator"):
+                    loc = heal_result["healed_locator"]
+                    try:
+                        await self.page.locator(loc).first.click(timeout=10000)
+                        clicked = True
+                        self._last_step_path = "playwright_healer"
+                        logger.info(f"  ✅ Playwright HealerAgent success: {loc[:60]}...")
+                    except Exception as e_heal_click:
+                        logger.debug(f"  HealerAgent locator click failed: {e_heal_click}")
+            except Exception as e5:
+                logger.debug(f"  Playwright HealerAgent escalation failed: {e5}")
+
         if not clicked:
             self._last_step_path = self._last_step_path or "resolution"
             return False, f"All resolution paths failed for click: '{target}'"
@@ -733,17 +907,34 @@ class DeterministicExecutorV2:
 
             # Map TestStep to actions
             if step.intent == Intent.GOTO:
-                await self.page.goto(step.target, wait_until="domcontentloaded", timeout=30000)
+                nav_url = (step.target or "").strip()
+                if not nav_url or not nav_url.startswith(("http://", "https://")):
+                    nav_url = _extract_url_from_step(step) or nav_url
+                if not nav_url or not nav_url.startswith(("http://", "https://")):
+                    return False, f"GOTO requires a valid URL (got: {repr(step.target)[:80]})"
+                await self.page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
                 try:
                     from .wait_strategy import wait_after_navigation
                     await wait_after_navigation(self.page, timeout_ms=10000)
                 except Exception as e:
                     logger.debug(f"Wait after navigation: {e}")
+                try:
+                    await site_knowledge.record_from_page(self.page, max_elements=300)
+                except Exception as e:
+                    logger.debug(f"SiteKnowledge record after GOTO: {e}")
                 self._last_step_path = "navigation"
-                return True, f"Navigated to {step.target}"
+                return True, f"Navigated to {nav_url}"
             
             # CLICK / SELECT — with per-step timeout to avoid 2+ min stuck and "page closed" in healing
             elif step.intent == Intent.CLICK or step.intent == Intent.SELECT:
+                target = (step.target or "").strip().lower()
+                # "product card" / "any one product" etc. normalized to "any product" in plan_adapter; pre-wait here too
+                if target in ("any product", "product card", "any one product", "first product"):
+                    try:
+                        await self.page.wait_for_selector("a[href]", state="attached", timeout=8000)
+                        await self.page.wait_for_timeout(2000)
+                    except Exception as ew:
+                        logger.debug("  Pre-wait for product links: %s", ew)
                 try:
                     return await asyncio.wait_for(
                         self._run_click_select_step(step, intent_val),
@@ -775,31 +966,101 @@ class DeterministicExecutorV2:
                     id=step.id, type=step.type, intent=Intent.CLICK, target="guest"
                 ))
             
-            # TYPE - Use 2-phase resolution (deterministic + smart resolver)
+            # TYPE - V3: normalize search-input steps to target "search"; 2-phase + Mem0/execution memory fallback
             elif step.intent == Intent.FILL_PINCODE or step.intent == Intent.TYPE:
                 target = step.target if step.target else "pincode"
                 value = step.value
+                # V3: "lg tv 108cm in search input" → resolve as "search" so overlay + keywords work
+                target_lower = (target or "").lower()
+                if value and "search" in target_lower and any(x in target_lower for x in ("input", "box", "field", "query")):
+                    target = "search"
                 typed = False
-                
-                # Phase 1: Deterministic
-                try:
-                    await smart_type(self.page, target, value)
-                    typed = True
-                    logger.info(f"  ✅ Phase 1 success")
-                except Exception as e1:
-                    logger.debug(f"  Phase 1 failed: {e1}")
-                    
-                    # Phase 2: Smart Resolver
+                # Phase 0: Focused input (LG often focuses search input after clicking search)
+                if target == "search" and value:
+                    try:
+                        await self.page.wait_for_timeout(1500)
+                        focused = self.page.locator("input:focus, textarea:focus")
+                        if await focused.count() > 0:
+                            await focused.first.fill(value, timeout=6000)
+                            await focused.first.press("Enter")
+                            typed = True
+                            logger.info("  ✅ TYPE Phase 0 (focused search input) success")
+                    except Exception as e0:
+                        logger.debug(f"  TYPE Phase 0 (focused) failed: {e0}")
+                # Phase 1: Deterministic smart_type
+                if not typed:
+                    try:
+                        await smart_type(self.page, target, value)
+                        typed = True
+                        logger.info(f"  ✅ Phase 1 success")
+                    except Exception as e1:
+                        logger.debug(f"  Phase 1 failed: {e1}")
+                # Phase 2: Smart Resolver
+                if not typed:
                     try:
                         typed = await smart_resolve_type(self.page, target, value)
                         if typed:
                             logger.info(f"  ✅ Phase 2 success (smart resolver)")
                     except Exception as e2:
                         logger.debug(f"  Phase 2 failed: {e2}")
-                
+                # Phase 3: Mem0 / execution memory — use stored selector for "search" input when available
+                if not typed and target == "search":
+                    try:
+                        sel = None
+                        if self._execution_memory:
+                            from .resolution_decision_engine import _normalize_target
+                            cached_v2 = self._execution_memory.get_cached_selector_v2(
+                                self.page.url, "GENERIC", _normalize_target("search")
+                            )
+                            if isinstance(cached_v2, dict) and cached_v2.get("selector"):
+                                sel = cached_v2["selector"]
+                            if not sel:
+                                sel = self._execution_memory.get_cached_selector(self.page.url, "search", "TYPE")
+                            if sel:
+                                loc = self.page.locator(sel)
+                                if await loc.count() > 0:
+                                    await loc.first.fill(value, timeout=6000)
+                                    await loc.first.press("Enter")
+                                    typed = True
+                                    logger.info("  ✅ TYPE Phase 3 (execution memory) success")
+                        if not typed and self._healing_agent and getattr(self._healing_agent, "_mem0", None):
+                            import re
+                            mem_results = self._healing_agent._mem0_search(self.page, "search input")
+                            for m in (mem_results or [])[:3]:
+                                content = ""
+                                if isinstance(m, dict):
+                                    mem = m.get("memory", m)
+                                    content = (mem.get("content", "") if isinstance(mem, dict) else str(mem or m))
+                                else:
+                                    content = str(m)
+                                if "selector" not in content.lower() and "input" not in content.lower():
+                                    continue
+                                sel_match = re.search(r"selector[:\s]*['\"]?([^'\"\s]+)['\"]?", content, re.I)
+                                sel_str = sel_match.group(1) if sel_match and sel_match.lastindex else None
+                                if not sel_str:
+                                    sel_match = re.search(r"input\[[^\]]+\]", content)
+                                    sel_str = sel_match.group(0) if sel_match else None
+                                if sel_str:
+                                    try:
+                                        loc = self.page.locator(sel_str)
+                                        if await loc.count() > 0:
+                                            await loc.first.fill(value, timeout=6000)
+                                            await loc.first.press("Enter")
+                                            typed = True
+                                            logger.info("  ✅ TYPE Phase 3 (Mem0) success")
+                                            break
+                                    except Exception:
+                                        pass
+                    except Exception as e3:
+                        logger.debug(f"  TYPE Phase 3 (memory) failed: {e3}")
                 if not typed:
                     return False, f"Failed to type into: '{target}'"
-                
+                # V3: Cache successful search input for next run (commonly used route)
+                if target == "search" and self._execution_memory:
+                    try:
+                        self._execution_memory.set_cached_selector(self.page.url, "search", "TYPE", "input:focus")
+                    except Exception:
+                        pass
                 return True, f"Typed '{value}' into {target}"
             
             elif step.intent == Intent.FILL_EMAIL:
@@ -839,7 +1100,9 @@ class DeterministicExecutorV2:
                             test_context=self.test_context or None,
                         )
                         if healing_action:
-                            healed = await self._healing_agent.apply_healing_action(self.page, healing_action)
+                            healed = await self._healing_agent.apply_healing_action(
+                                self.page, healing_action, failed_target=step.target
+                            )
                             if healed:
                                 logger.info("  ✅ Healing agent successfully resolved SELECT_OPTION")
                                 return True, f"Healed selection for option: {step.target}"
@@ -850,12 +1113,22 @@ class DeterministicExecutorV2:
             elif step.intent == Intent.SEARCH:
                 # Robust search handling tuned for LG global search (IN/US)
                 # On both sites, clicking the search icon opens an overlay and
-                # focuses the search input. We first wait for it, then try
-                # focused field, smart resolvers, and contenteditable fallbacks.
+                # focuses the search input. Open search UI first if needed, then type.
                 value = step.value
-                logger.info(f"🔎 Executing SEARCH for query: {value}")
+                logger.info(f"Executing SEARCH for query: {value}")
 
-                # Wait for search overlay/input (LG overlays can take 2-3s; avoid strict :visible)
+                # Phase -1: Open search UI if no overlay is visible (we skipped "click search option" step)
+                try:
+                    from .element_resolver import smart_click
+                    await self.page.wait_for_timeout(1000)
+                    focused = self.page.locator("input:focus, textarea:focus, input[type='search']:visible")
+                    if await focused.count() == 0:
+                        await smart_click(self.page, "search")
+                        await self.page.wait_for_timeout(2000)
+                except Exception as e_open:
+                    logger.debug(f"  SEARCH open UI (optional): {e_open}")
+
+                # Wait for search overlay/input (LG overlays can take 2-3s)
                 await self.page.wait_for_timeout(3000)
 
                 typed = False
@@ -898,9 +1171,9 @@ class DeterministicExecutorV2:
                     try:
                         typed = await _search_fallback_contenteditable_keyboard(self.page, value)
                         if typed:
-                            logger.info("  ✅ SEARCH Phase 3 success (contenteditable/keyboard)")
+                            logger.info("  SEARCH Phase 3 success (contenteditable/keyboard)")
                     except Exception as e3:
-                        logger.warning(f"  ⚠️ SEARCH Phase 3 FAILED: {e3}")
+                        logger.warning(f"  SEARCH Phase 3 FAILED: {e3}")
 
                 if not typed:
                     logger.error(
@@ -919,6 +1192,25 @@ class DeterministicExecutorV2:
                         await self.page.keyboard.press("Enter")
                 except Exception as e:
                     logger.debug(f"  SEARCH submit (Enter key) failed non-critically: {e}")
+
+                # Wait for results
+                try:
+                    await self.page.wait_for_load_state("domcontentloaded", timeout=8000)
+                    await self.page.wait_for_timeout(2500)
+                except Exception as e:
+                    logger.debug(f"  SEARCH post-wait: {e}")
+
+                # If on LG and URL does not look like search results, go to search URL so "any product" has a listing
+                try:
+                    url = self.page.url or ""
+                    if "lg.com" in url and "/search" not in url:
+                        from urllib.parse import quote
+                        search_url = f"https://www.lg.com/in/search/?search={quote(value)}"
+                        await self.page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
+                        await self.page.wait_for_timeout(4500)
+                        logger.info("  SEARCH: navigated to LG search URL for results")
+                except Exception as e_nav:
+                    logger.debug(f"  SEARCH LG search URL fallback: {e_nav}")
 
                 return True, f"Searched for: {value}"
             

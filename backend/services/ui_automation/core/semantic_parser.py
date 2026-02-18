@@ -11,6 +11,16 @@ from .test_model import TestStep, TestCase, StepType, Intent, PageState
 
 logger = logging.getLogger(__name__)
 
+# Action verbs that start a new step after " then " or " and "
+_ACTION_VERB_PATTERN = re.compile(
+    r"\s+then\s+(?=click|search|fill|select|type|enter|choose|press|open|wait)",
+    re.I,
+)
+_AND_ACTION_PATTERN = re.compile(
+    r"\s+and\s+(?=search\s+for|search\s+|fill\s+|click\s+on|click\s+|select\s+|type\s+|enter\s+|choose\s+)",
+    re.I,
+)
+
 
 class SemanticTestParser:
     """
@@ -70,8 +80,12 @@ class SemanticTestParser:
                     steps.append(parsed_step)
                     step_id += 1
             else:
-                # Split by commas for regular steps (non-product descriptions)
-                sub_steps = [s.strip() for s in raw_step.split(',') if s.strip()]
+                # First split compound instructions: "click search and search for X and then click buynow" -> separate steps
+                compound_chunks = SemanticTestParser._split_compound_instruction(raw_step)
+                # Then split by commas within each chunk (e.g. "fill pincode 500032, then click check")
+                sub_steps = []
+                for chunk in compound_chunks:
+                    sub_steps.extend([s.strip() for s in chunk.split(",") if s.strip()])
                 for sub_step in sub_steps:
                     # Extract "wait for N seconds" (standalone or "after that wait for N seconds")
                     wait_match = re.search(r'(?:after that\s+)?wait for (\d+)\s*seconds?', sub_step, re.I)
@@ -163,6 +177,38 @@ class SemanticTestParser:
         )
     
     @staticmethod
+    def _split_compound_instruction(line: str) -> List[str]:
+        """
+        Split a line that contains multiple actions into separate step phrases.
+        Handles: "click on search and search for X and then click on buynow" ->
+          ["click on search", "search for X", "click on buynow"]
+        Does not split product lines or "billing and shipping".
+        """
+        if not line or not line.strip():
+            return [line] if line else []
+        text = line.strip()
+        # 1) Split by " and then " (clear separator of two actions)
+        parts = re.split(r"\s+and\s+then\s+", text, flags=re.I)
+        out: List[str] = []
+        for p in parts:
+            p = p.strip()
+            if not p:
+                continue
+            # 2) Split by " then " when followed by an action verb
+            sub_parts = _ACTION_VERB_PATTERN.split(p)
+            for s in sub_parts:
+                s = s.strip()
+                if not s:
+                    continue
+                # 3) Split by " and " only when the part after " and " starts with an action phrase
+                and_sub = _AND_ACTION_PATTERN.split(s)
+                for a in and_sub:
+                    a = a.strip()
+                    if a:
+                        out.append(a)
+        return out if out else [text]
+
+    @staticmethod
     def _extract_section_and_ordinal(target: str) -> tuple:
         """C1/C3: Extract section/container hint and ordinal from target. Returns (clean_target, metadata_dict or None)."""
         if not target or not isinstance(target, str):
@@ -205,6 +251,17 @@ class SemanticTestParser:
             if re.match(pattern, step_lower, re.IGNORECASE):
                 logger.debug(f"Filtered out product spec: '{step_text}'")
                 return None
+
+        # ==================== GENERIC NORMALIZATIONS / REDUNDANT STEPS ====================
+
+        # Many test cases say "click on search option" immediately followed by
+        # "search for X ...". The explicit click on the search icon is not
+        # required for deterministic automation (the SEARCH step will locate
+        # and type into the search box or overlay). To avoid fragile failures
+        # on icon-only search controls, we treat this as redundant and skip it.
+        if re.match(r'^(then\s+)?click\s+(on\s+)?search\s+(option|icon|button)s?\b', step_lower):
+            logger.debug(f"Skipping redundant search icon step: '{step_text}'")
+            return None
         
         # ==================== WAIT ====================
         wait_match = re.search(r'wait for (\d+)\s*(?:seconds?|secs?)?', step_lower)

@@ -18,8 +18,33 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+def _build_merged_schema_from_crawl(crawled_schemas: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a merged schema from crawled_schemas when LLM merge/parse fails. Flattens all fields into one dict."""
+    fields: Dict[str, Dict[str, Any]] = {}
+    for url, data in (crawled_schemas or {}).items():
+        if not isinstance(data, dict) or "error" in data:
+            continue
+        raw_fields = data.get("fields")
+        if isinstance(raw_fields, list):
+            for f in raw_fields:
+                if isinstance(f, dict) and f.get("name"):
+                    name = str(f.get("name")).strip()
+                    if name and name not in fields:
+                        fields[name] = {"type": f.get("type", "string"), "required": f.get("required", False)}
+        elif isinstance(raw_fields, dict):
+            for name, spec in raw_fields.items():
+                if isinstance(spec, dict) and name not in fields:
+                    fields[str(name)] = {"type": spec.get("type", "string"), "required": spec.get("required", False)}
+                elif name not in fields:
+                    fields[str(name)] = {"type": "string", "required": False}
+    if not fields:
+        fields["placeholder"] = {"type": "string", "required": False}
+    return {"fields": fields, "total_fields": len(fields)}
+
+
 def _parse_json_from_llm(content: str) -> Dict[str, Any]:
-    """Extract a single JSON object from LLM response (handles markdown and extra text)."""
+    """Extract a single JSON object from LLM response (handles markdown, extra text, trailing commas, single quotes, unquoted keys)."""
+    import ast
     if not content or not content.strip():
         raise ValueError("Empty response")
     text = content.strip()
@@ -37,6 +62,7 @@ def _parse_json_from_llm(content: str) -> Dict[str, Any]:
     # Find first complete JSON object
     start = text.find("{")
     if start == -1:
+        logger.debug("LLM response (no '{'): %s", content[:500])
         raise ValueError("No JSON object found in response")
     depth = 0
     for i in range(start, len(text)):
@@ -45,7 +71,36 @@ def _parse_json_from_llm(content: str) -> Dict[str, Any]:
         elif text[i] == "}":
             depth -= 1
             if depth == 0:
-                return json.loads(text[start : i + 1])
+                block = text[start : i + 1]
+                # Try strict JSON first
+                try:
+                    return json.loads(block)
+                except json.JSONDecodeError:
+                    pass
+                # Fix trailing commas before } or ]
+                fixed = re.sub(r",\s*([}\]])", r"\1", block)
+                try:
+                    return json.loads(fixed)
+                except json.JSONDecodeError:
+                    pass
+                # Fix unquoted keys (JavaScript-style): "word": only when preceded by { or ,
+                fixed2 = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', fixed)
+                try:
+                    return json.loads(fixed2)
+                except json.JSONDecodeError:
+                    pass
+                # Python literal (single-quoted keys/strings)
+                try:
+                    return ast.literal_eval(block)
+                except (ValueError, SyntaxError):
+                    pass
+                try:
+                    return ast.literal_eval(fixed)
+                except (ValueError, SyntaxError):
+                    pass
+                logger.warning("LLM JSON parse failed. Block (first 400 chars): %s", block[:400])
+                raise ValueError("Could not parse JSON from LLM (invalid syntax)")
+    logger.debug("LLM response (no complete object): %s", content[:500])
     raise ValueError("No complete JSON object found")
 
 
@@ -216,7 +271,12 @@ Return JSON:
         )
         
         raw = response.choices[0].message.content or ""
-        merged_schema = _parse_json_from_llm(raw)
+        try:
+            merged_schema = _parse_json_from_llm(raw)
+        except ValueError as parse_err:
+            logger.warning("LLM JSON parse failed (%s), building merged schema from crawl only", parse_err)
+            merged_schema = _build_merged_schema_from_crawl(crawled_schemas)
+        
         logger.info(f"✅ Merged schema with {len(merged_schema.get('fields', {}))} fields")
         if chat_id:
             append_agent_message(db, chat_id, f"Synthetic: merged crawled schemas into unified schema with {len(merged_schema.get('fields', {}))} fields.", {"stage": "merge_schemas"})
@@ -238,12 +298,34 @@ Return JSON:
         
     except Exception as e:
         logger.error(f"❌ Schema merge failed: {str(e)}")
+        # Fallback: build schema from crawled_schemas so workflow can continue
+        try:
+            merged_schema = _build_merged_schema_from_crawl(crawled_schemas)
+            db_schema = Schema(source="test_case_crawl", schema_json=merged_schema)
+            db.add(db_schema)
+            db.commit()
+            db.refresh(db_schema)
+            logger.info("✅ Used crawl-only fallback schema (%s fields)", len(merged_schema.get("fields", {})))
+            return {
+                **state,
+                "merged_schema": merged_schema,
+                "schema_id": db_schema.id,
+                "current_step": "generate_data",
+            }
+        except Exception as fallback_err:
+            logger.error("Fallback schema build failed: %s", fallback_err)
         if chat_id:
             append_agent_message(db, chat_id, f"Synthetic: schema merge failed: {e}", {"stage": "merge_error"})
-        return {
-            **state,
-            'error': f"Schema merge failed: {str(e)}"
-        }
+        # Ensure generate_data always has a schema (minimal so no KeyError)
+        minimal = {"fields": {"placeholder": {"type": "string", "required": False}}, "total_fields": 1}
+        try:
+            db_schema = Schema(source="test_case_crawl", schema_json=minimal)
+            db.add(db_schema)
+            db.commit()
+            db.refresh(db_schema)
+            return {**state, "merged_schema": minimal, "schema_id": db_schema.id, "current_step": "generate_data", "error": str(e)}
+        except Exception:
+            return {**state, "merged_schema": minimal, "current_step": "generate_data", "error": str(e)}
 
 
 def generate_data_node(state: SyntheticDataState, db: Session) -> Dict[str, Any]:

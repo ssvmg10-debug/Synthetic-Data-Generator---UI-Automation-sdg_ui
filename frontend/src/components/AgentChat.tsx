@@ -92,6 +92,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
   const [scriptLanguage, setScriptLanguage] = useState<"javascript" | "typescript">("javascript");
   const [useSyntheticData, setUseSyntheticData] = useState(false);
   const [visibleBrowser, setVisibleBrowser] = useState(true);
+  const [startUrl, setStartUrl] = useState("");
   const [liveTick, setLiveTick] = useState(0);
   const [runStage, setRunStage] = useState<string | null>(null);
   const [liveScreenshotError, setLiveScreenshotError] = useState(false);
@@ -267,6 +268,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
               body: JSON.stringify({
                 natural_language: combinedText,
                 visible_browser: visibleBrowser,
+                start_url: startUrl.trim() || undefined,
+                use_planner_agents: true,
+                use_generator_hints: true,
+                use_healer_agent_in_v2: true,
                 chat_id: chatId ?? undefined
               })
             });
@@ -405,6 +410,16 @@ export const AgentChat: React.FC<AgentChatProps> = ({ agentType }) => {
                   type="checkbox"
                   checked={visibleBrowser}
                   onChange={e => setVisibleBrowser(e.target.checked)}
+                />
+              </label>
+              <label className="agent-setting">
+                <span>Start URL (optional)</span>
+                <input
+                  type="text"
+                  placeholder="e.g. https://www.lg.com/in"
+                  value={startUrl}
+                  onChange={e => setStartUrl(e.target.value)}
+                  style={{ width: "220px" }}
                 />
               </label>
             </div>

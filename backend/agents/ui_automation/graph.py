@@ -133,7 +133,8 @@ async def run_ui_automation_workflow(test_case: str, db: Session, max_healing_at
         'last_error_locator': None,
         'current_step': 'plan_test',
         'thread_id': None,
-        'testcase_id': None
+        'testcase_id': None,
+        'max_healing_attempts': 3,
     }
     
     # Run workflow

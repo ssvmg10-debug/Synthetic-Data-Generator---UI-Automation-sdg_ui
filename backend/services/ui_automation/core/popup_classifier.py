@@ -112,11 +112,22 @@ async def dismiss_popup_by_type(
     Dismiss popup using type-appropriate buttons.
     If prefer_guest and type is LOGIN, prefer "Continue as guest" etc.
     """
+    scope = modal_locator if modal_locator is not None else page
+    # LG / similar "How may I help you?" quick menu: close by specific class or aria
+    try:
+        quick_close = scope.locator("button.al-quick-menu__close, [aria-label='close' i], button:has([class*='close'])")
+        if await quick_close.count() > 0 and await quick_close.first.is_visible():
+            await quick_close.first.click(timeout=1000)
+            logger.info("  Dismissed popup (quick menu close button)")
+            await page.wait_for_timeout(400)
+            return True
+    except Exception:
+        pass
+
     buttons_to_try = DISMISS_BY_TYPE.get(popup_type, DISMISS_BY_TYPE[PopupType.GENERIC])
     if popup_type == PopupType.LOGIN and prefer_guest:
         buttons_to_try = DISMISS_BY_TYPE[PopupType.LOGIN]
 
-    scope = modal_locator if modal_locator is not None else page
     try:
         buttons = scope.locator("button, a, [role='button'], input[type='submit']")
         n = await buttons.count()
